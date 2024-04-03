@@ -67,20 +67,20 @@ class UserSignupSerializer(serializers.ModelSerializer):
         return password
 
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
+        user = models.User.objects.create_user(**validated_data)
 
         refresh = jwt_tokens.RefreshToken.for_user(user)
 
         if jwt_api_settings.UPDATE_LAST_LOGIN:
             update_last_login(None, user)
-            
-        data = {
-            'id': user.id, 
-            'email': user.email, 
-            'first_name': user.first_name, 
-            'last_name': user.last_name, 
-            'access': str(refresh.access_token), 
-            'refresh': str(refresh)}
+        
+        notifications.AccountActivationEmail(
+            user=user, data={'user_id': user.id.hashid, 'token': tokens.account_activation_token.make_token(user)}
+        ).send()
+        
+        data = UserSerializer(user).data
+        data['access'] = str(refresh.access_token)
+        data['refresh'] = str(refresh)
         return data
 
 
@@ -163,7 +163,6 @@ class PasswordResetSerializer(serializers.Serializer):
             notifications.PasswordResetEmail(
                 user=user, data={'user_id': user.id.hashid, 'token': tokens.password_reset_token.make_token(user)}
             ).send()
-
         return {"ok": True}
 
 

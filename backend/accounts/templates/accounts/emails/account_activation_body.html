@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Verify Your Account</title>
+    </head>
+    <body>
+        <p>Please click on the link below to confirm your account in {{ site_url }}</p>
+        <a href="{{ site_url }}{% url 'accounts:account-confirm' user_id token %}" target="_blank">Confirm Account</a>
+        <br>
+        Thank You
+    </body>
+</html>

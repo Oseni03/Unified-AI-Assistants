@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
 
 
 class SendEmail:
@@ -10,7 +11,8 @@ class SendEmail:
     def apply(self, to: str, data, due_date=None):
         if data is None:
             data = {}
-
+        
+        data["site_url"] = settings.DOMAIN_URL
         if self.name == "ACCOUNT_ACTIVATION":
             subject = render_to_string(
                 "accounts/emails/account_activation_subject.txt", 
