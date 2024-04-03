@@ -11,7 +11,7 @@ NOTE : Before we start make sure you have created the django project with simple
 
 First we need to install two packages to handle our normal as well as social authentication integration.
 
-pip install djoser
+pip install rest-framework-simplejwt
 pip install social-django
 
 
