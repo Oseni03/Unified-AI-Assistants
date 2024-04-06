@@ -1,8 +1,8 @@
 # Unified AI Assist
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Issues](https://img.shields.io/github/issues/your_username/project_name.svg)](https://github.com/your_username/project_name/issues)
-[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/your_username/project_name.svg)](https://github.com/your_username/project_name/pulls)
+[![GitHub Issues](https://img.shields.io/github/issues/your_username/project_name.svg)](https://github.com/Oseni03/Unified-AI-Assist/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/your_username/project_name.svg)](https://github.com/Oseni03/Unified-AI-Assist/pulls)
 
 ## Description
 
