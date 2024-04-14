@@ -12,7 +12,9 @@ from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
 from slack_sdk.oauth import AuthorizeUrlGenerator
 
-from .models import Installation, State
+from .utils import fetch_response, save_bot
+from .models import Bot, State
+from .serializers import BotSerializer
 
 
 # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
@@ -59,47 +61,12 @@ class OAUTHCallbackView(generics.GenericAPIView):
                     # redirect_uri=redirect_uri,
                     code=request.args["code"]
                 )
-                installed_enterprise = oauth_response.get("enterprise") or {}
-                is_enterprise_install = oauth_response.get("is_enterprise_install")
-                installed_team = oauth_response.get("team") or {}
-                installer = oauth_response.get("authed_user") or {}
-                incoming_webhook = oauth_response.get("incoming_webhook") or {}
-                bot_token = oauth_response.get("access_token")
-                # NOTE: oauth.v2.access doesn't include bot_id in response
-                bot_id = None
-                enterprise_url = None
-                if bot_token is not None:
-                    auth_test = client.auth_test(token=bot_token)
-                    bot_id = auth_test["bot_id"]
-                    if is_enterprise_install is True:
-                        enterprise_url = auth_test.get("url")
+                
+                bot = save_bot(oauth_response, client)
 
-                installation = Installation(
-                    app_id=oauth_response.get("app_id"),
-                    enterprise_id=installed_enterprise.get("id"),
-                    enterprise_name=installed_enterprise.get("name"),
-                    enterprise_url=enterprise_url,
-                    team_id=installed_team.get("id"),
-                    team_name=installed_team.get("name"),
-                    bot_token=bot_token,
-                    bot_id=bot_id,
-                    bot_user_id=oauth_response.get("bot_user_id"),
-                    bot_scopes=oauth_response.get("scope"),  # comma-separated string
-                    user_id=installer.get("id"),
-                    user_token=installer.get("access_token"),
-                    user_scopes=installer.get("scope"),  # comma-separated string
-                    incoming_webhook_url=incoming_webhook.get("url"),
-                    incoming_webhook_channel=incoming_webhook.get("channel"),
-                    incoming_webhook_channel_id=incoming_webhook.get("channel_id"),
-                    incoming_webhook_configuration_url=incoming_webhook.get("configuration_url"),
-                    is_enterprise_install=is_enterprise_install,
-                    token_type=oauth_response.get("token_type"),
-                )
+                serializer = BotSerializer(instance=bot)
 
-                # Store the installation
-                installation.save()
-
-                return Response({"message": "Thanks for installing this app!"}, status=status.HTTP_200_OK)
+                return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 return Response({"message": "Try the installation again (the state value is already expired)"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -117,6 +84,8 @@ class EventView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, **kwargs):
+        print(request.get_data()) 
+
         # Verify incoming requests from Slack
         # https://api.slack.com/authentication/verifying-requests-from-slack
         if not signature_verifier.is_valid(
@@ -125,70 +94,64 @@ class EventView(generics.GenericAPIView):
             signature=request.headers.get("X-Slack-Signature")):
             return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
 
-        # Handle a slash command invocation
-        if "command" in request.form \
-            and request.form["command"] == "/open-modal":
-            try:
-                # in the case where this app gets a request from an Enterprise Grid workspace
-                enterprise_id = request.form.get("enterprise_id")
-                # The workspace's ID
-                team_id = request.form["team_id"]
-                # Lookup the stored bot token for this workspace
-                bot = Installation.objects.get(
-                    enterprise_id=enterprise_id,
-                    team_id=team_id,
-                )
-                bot_token = bot.bot_token if bot else None
-                if not bot_token:
-                    # The app may be uninstalled or be used in a shared channel
-                    return Response("Please install this app first!", status=status.HTTP_200_OK)
+            
+        print(request.form)
+        print(request.data)
 
-                # Open a modal using the valid bot token
-                client = WebClient(token=bot_token)
-                trigger_id = request.form["trigger_id"]
-                response = client.views_open(
-                    trigger_id=trigger_id,
-                    view={
-                        "type": "modal",
-                        "callback_id": "modal-id",
-                        "title": {
-                            "type": "plain_text",
-                            "text": "Awesome Modal"
-                        },
-                        "submit": {
-                            "type": "plain_text",
-                            "text": "Submit"
-                        },
-                        "blocks": [
-                            {
-                                "type": "input",
-                                "block_id": "b-id",
-                                "label": {
-                                    "type": "plain_text",
-                                    "text": "Input label",
-                                },
-                                "element": {
-                                    "action_id": "a-id",
-                                    "type": "plain_text_input",
-                                }
-                            }
-                        ]
+        # in the case where this app gets a request from an Enterprise Grid workspace
+        enterprise_id = request.form.get("enterprise_id")
+        # The workspace's ID
+        team_id = request.form["team_id"]
+        
+        # Lookup the stored bot token for this workspace
+        bot = Bot.objects.filter(
+            enterprise_id=enterprise_id,
+            team_id=team_id,
+        )
+        bot_token = bot.first().bot_token if bot.exists() else None
+        if not bot_token:
+            # The app may be uninstalled or be used in a shared channel
+            return Response("Please install this app first!", status=status.HTTP_200_OK)
+
+        # Open a modal using the valid bot token
+        client = WebClient(token=bot_token)
+        trigger_id = request.form["trigger_id"]
+
+        channel_id = request.form['channel']
+        thread_ts = request.form['ts']
+        query = request.form.get("text")
+
+        # Post an initial message
+        result = client.chat_postpayload(channel=channel_id, text=":mag: Searching...", thread_ts=thread_ts)
+        thread_ts = result["ts"]
+        
+        # Fetch response using RemoteRunnable
+        response = fetch_response(query)
+
+        # Process response and send follow-up message
+        output_text = response['output']  # Adjust according to your actual response structure
+
+        #Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
+        client.chat_update(
+            channel=channel_id,
+            ts=thread_ts,
+            text=output_text,
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": output_text
                     }
-                )
-                return Response("", status.HTTP_200_OK)
-            except SlackApiError as e:
-                code = e.response["error"]
-                return Response(f"Failed to open a modal due to {code}", status=status.HTTP_200_OK)
+                }
+            ]
+        )
 
-        elif "payload" in request.form:
-            # Data submission from the modal
-            payload = json.loads(request.form["payload"])
-            if payload["type"] == "view_submission" \
-                and payload["view"]["callback_id"] == "modal-id":
-                submitted_data = payload["view"]["state"]["values"]
-                print(submitted_data)  # {'b-id': {'a-id': {'type': 'plain_text_input', 'value': 'your input'}}}
-                # You can use WebClient with a valid token here too
-                return Response("", status=status.HTTP_200_OK)
+        resp_data = {
+            "query": query,
+            "response": {
+                "mrkdwn": output_text,
+            }
+        }
 
-        # Indicate unsupported request patterns
-        return Response("", status=status.HTTP_404_NOT_FOUND)
+        return Response(resp_data, status=status.HTTP_200_OK)

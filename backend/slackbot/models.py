@@ -7,7 +7,7 @@ from django.db import models
 from slack_sdk.oauth.installation_store.models.bot import Bot
 
 # Create your models here.
-class Installation(models.Model):
+class Bot(models.Model):
     app_id = models.CharField(max_length=255, null=True)
     user_id = models.CharField(max_length=255)
     enterprise_id = models.CharField(max_length=255, null=True)
