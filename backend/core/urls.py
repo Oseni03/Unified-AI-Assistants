@@ -35,7 +35,7 @@ urlpatterns = [
         include(
             [
                 path("", include("accounts.urls", namespace="accounts")),
-                path("slack/", include("slackbot.urls", namespace="slackbot")),
+                path("slack/", include("bots.slackbot.urls", namespace="slackbot")),
                 # path("agents/", include("agents.urls", namespace="agents")),
             ]
         ),

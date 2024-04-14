@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     
     # INTERNAL APPS 
     "accounts",
-    "slackbot",
+    "bots.slackbot",
     "agents",
     
     # THIRD-PARTY AUTH APPS
