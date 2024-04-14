@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     
     # INTERNAL APPS 
     "accounts",
+    "slackbot",
     
     # THIRD-PARTY AUTH APPS
     "social_django",
@@ -212,3 +213,12 @@ OTP_AUTH_ISSUER_NAME = env("OTP_AUTH_ISSUER_NAME", default="")
 OTP_AUTH_TOKEN_COOKIE = 'otp_auth_token'
 OTP_AUTH_TOKEN_LIFETIME_MINUTES = datetime.timedelta(minutes=env.int('OTP_AUTH_TOKEN_LIFETIME_MINUTES', default=5))
 OTP_VALIDATE_PATH = "/auth/validate-otp"
+
+
+# SLACK VARIABLES
+SLACK_SCOPES = env("SLACK_SCOPES", default=[])
+SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
+SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
+SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
+SLACK_EVENT_URL = env("SLACK_EVENT_URL", default="/slack/events")
+SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=300)
