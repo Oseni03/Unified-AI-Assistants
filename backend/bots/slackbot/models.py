@@ -6,8 +6,11 @@ from django.db import models
 
 from slack_sdk.oauth.installation_store.models.bot import Bot
 
+from agents.models import Agent
+
 # Create your models here.
 class Bot(models.Model):
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="slackbots")
     app_id = models.CharField(max_length=255, null=True)
     user_id = models.CharField(max_length=255)
     enterprise_id = models.CharField(max_length=255, null=True)
@@ -185,11 +188,11 @@ class State(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    @staticmethod
+    @classmethod
     def issue():
         return State().id
     
-    @staticmethod
+    @classmethod
     def consume(state: uuid4):
         try:
             state = State.objects.get(id=state, is_used=False)

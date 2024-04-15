@@ -1,4 +1,4 @@
-from rest_framework import exceptions, serializers, validators
+from rest_framework import serializers
 
 from .models import Bot
 
