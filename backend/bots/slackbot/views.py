@@ -113,13 +113,17 @@ class EventView(generics.GenericAPIView):
             # The app may be uninstalled or be used in a shared channel
             return Response("Please install this app first!", status=status.HTTP_200_OK)
 
-        # Open a modal using the valid bot token
         client = WebClient(token=bot_token)
+        bot_id = client.api_call("auth.test")["user_id"]
         trigger_id = request.form["trigger_id"]
 
         channel_id = request.form['channel']
         thread_ts = request.form['ts']
+        user_id = request.form["user"]
         query = request.form.get("text")
+
+        if user_id == bot_id: # OR if request.form.get('subtype') == 'bot_message':
+            return Response({}, status=status.HTTP_200_OK)
 
         # Post an initial message
         result = client.chat_postpayload(channel=channel_id, text=":mag: Searching...", thread_ts=thread_ts)
