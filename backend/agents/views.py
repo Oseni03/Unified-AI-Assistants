@@ -1,5 +1,3 @@
-from django.shortcuts import render
-
 from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 

@@ -7,9 +7,10 @@ from django.db import models
 from slack_sdk.oauth.installation_store.models.bot import Bot
 
 from agents.models import Agent
+from common.models import AbstractBaseModel
 
 # Create your models here.
-class Bot(models.Model):
+class Bot(AbstractBaseModel):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="slackbots")
     app_id = models.CharField(max_length=255, null=True)
     user_id = models.CharField(max_length=255)
@@ -182,11 +183,8 @@ class Bot(models.Model):
         return {**self.custom_values, **standard_values}
 
 
-class State(models.Model):
-    id = models.UUIDField(primary_key=True, unique=True, default=uuid4)
+class State(AbstractBaseModel):
     is_used = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     @classmethod
     def issue():

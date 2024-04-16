@@ -5,6 +5,6 @@ from . import views
 
 app_name = "agents"
 
-url_patterns = [
+urlpatterns = [
     path("", views.AgentAPIView.as_view(), name="agent-list"),
 ]

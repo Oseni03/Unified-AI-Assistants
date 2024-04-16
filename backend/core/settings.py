@@ -36,9 +36,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # INTERNAL APPS 
+    "common",
     "accounts",
-    "bots.slackbot",
     "agents",
+    "bots.slackbot",
     
     # THIRD-PARTY AUTH APPS
     "social_django",

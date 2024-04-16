@@ -26,8 +26,6 @@ class SalesForceTools:
         print (f"search_string: {search_string}")
         search_result = self.sf.search(search_string)
         
-
-        
         # Initialize an empty list to store formatted article details
         articles_details = []
 

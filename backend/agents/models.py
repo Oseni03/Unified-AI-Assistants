@@ -1,24 +1,20 @@
 from django.db import models
+from django.conf import settings
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from langchain.agents.agent import AgentExecutor
 
-from accounts.models import User
+from common.models import AbstractBaseModel
+
 
 # Create your models here.
-class Agent(models.Model):
-    class AgentType(models.TextChoices):
-        PRIVATE = "PRIVATE", _("Private")
-        PUBLIC = "PUBLIC", _("Public")
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="agents", null=True)
+class Agent(AbstractBaseModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents", null=True)
     name = models.CharField(max_length=255)
-    type = models.CharField(max_length=20, choices=AgentType.choices, default=AgentType.PRIVATE)
+    is_public = models.BooleanField(default=False)
     data = models.JSONField(null=True) # agent.json() or agent.dict()
     slug = models.SlugField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return str(self.name)
