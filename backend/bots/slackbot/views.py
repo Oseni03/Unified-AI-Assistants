@@ -4,6 +4,7 @@ import uuid
 
 from django.conf import settings
 
+from django.shortcuts import get_object_or_404
 from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 
@@ -11,6 +12,8 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
 from slack_sdk.oauth import AuthorizeUrlGenerator
+
+from agents.models import Agent
 
 from .utils import fetch_response, save_bot
 from .models import Bot, State
@@ -61,8 +64,11 @@ class OAUTHCallbackView(generics.GenericAPIView):
                     # redirect_uri=redirect_uri,
                     code=request.args["code"]
                 )
+
+                agent_id = int(request.session.get("agent_id"))
+                agent = get_object_or_404(Agent, id=agent_id)
                 
-                bot = save_bot(oauth_response, client)
+                bot = save_bot(agent, oauth_response, client)
 
                 serializer = BotSerializer(instance=bot)
 
