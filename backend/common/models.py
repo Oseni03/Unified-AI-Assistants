@@ -1,5 +1,12 @@
+import datetime
+import hashlib
+import os
+from uuid import uuid4
 import hashid_field
+
 from django.db import models
+from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 
 # Create your models here.
@@ -17,3 +24,35 @@ class AbstractBaseModel(models.Model):
 
     def __str__(self):
         return "ah yes"
+
+
+class ThirdParty(models.TextChoices):
+    GOOGLE = "google", _("Google Workspace")
+    SALESFORCE = "salesforce", _("Salesforce")
+    SLACK = "slack", _("Slack")
+
+
+class State(AbstractBaseModel):
+    is_used = models.BooleanField(default=False)
+    state = models.CharField(max_length=300)
+    thirdparty = models.CharField(max_length=25, choices=ThirdParty.choices)
+
+    @classmethod
+    def issue(cls, thirdparty: ThirdParty):
+        cls.state = hashlib.sha256(os.urandom(1024)).hexdigest()
+        cls.thirdparty = thirdparty
+        cls.save()
+        return cls.state
+    
+    @classmethod
+    def consume(cls, state):
+        try:
+            state = State.objects.get(state=state, is_used=False)
+            state.is_used = True
+            state.save()
+
+            expiration = state.created_at + datetime.timedelta(seconds=settings.SLACK_STATE_EXPIRATION_SECONDS)
+            still_valid: bool = datetime.now() < expiration
+            return still_valid
+        except:
+            return False

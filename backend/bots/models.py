@@ -182,23 +182,3 @@ class Bot(AbstractBaseModel):
         # when the same keys exist in both
         return {**self.custom_values, **standard_values}
 
-
-class State(AbstractBaseModel):
-    is_used = models.BooleanField(default=False)
-
-    @classmethod
-    def issue():
-        return State().id
-    
-    @classmethod
-    def consume(state: uuid4):
-        try:
-            state = State.objects.get(id=state, is_used=False)
-            state.is_used = True
-            state.save()
-
-            expiration = state.created_at + timedelta(seconds=settings.SLACK_STATE_EXPIRATION_SECONDS)
-            still_valid: bool = datetime.now() < expiration
-            return still_valid
-        except:
-            return False

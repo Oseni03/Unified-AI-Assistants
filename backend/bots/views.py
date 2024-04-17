@@ -14,9 +14,10 @@ from slack_sdk import WebClient
 from slack_sdk.oauth import AuthorizeUrlGenerator
 
 from agents.models import Agent
+from common.models import State, ThirdParty
 
 from .utils import fetch_response, save_bot
-from .models import Bot, State
+from .models import Bot
 from .serializers import BotSerializer
 
 
@@ -30,21 +31,23 @@ authorize_url_generator = AuthorizeUrlGenerator(
 
 # Create your views here.
 class OAUTHView(generics.GenericAPIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, **kwargs):
+    def get(self, request, thirdparty, agent_id, **kwargs):
+        request.session["agent_id"] = agent_id
         # Generate a random value and store it on the server-side
-        state = str(State.issue())
-        # https://slack.com/oauth/v2/authorize?state=(generated value)&client_id={client_id}&scope=app_mentions:read,chat:write&user_scope=search:read
-        url = authorize_url_generator.generate(state)
-        button = f'''<a href="{html.escape(url)}">
-            <img 
-                alt="Add to Slack" 
-                height="40" 
-                width="139" 
-                src="https://platform.slack-edge.com/img/add_to_slack.png" 
-                srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" />
-        </a>'''
+        state = str(State.issue(thirdparty))
+        if thirdparty == ThirdParty.SLACK:
+            # https://slack.com/oauth/v2/authorize?state=(generated value)&client_id={client_id}&scope=app_mentions:read,chat:write&user_scope=search:read
+            url = authorize_url_generator.generate(state)
+            button = f'''<a href="{html.escape(url)}">
+                <img 
+                    alt="Add to Slack" 
+                    height="40" 
+                    width="139" 
+                    src="https://platform.slack-edge.com/img/add_to_slack.png" 
+                    srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" />
+            </a>'''
         return {"button": button}
 
 
@@ -65,7 +68,7 @@ class OAUTHCallbackView(generics.GenericAPIView):
                     code=request.args["code"]
                 )
 
-                agent_id = int(request.session.get("agent_id"))
+                agent_id = request.session.get("agent_id")
                 agent = get_object_or_404(Agent, id=agent_id)
                 
                 bot = save_bot(agent, oauth_response, client)
@@ -90,7 +93,7 @@ class EventView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, **kwargs):
-        print(request.get_data()) 
+        print(request.data) 
 
         # Verify incoming requests from Slack
         # https://api.slack.com/authentication/verifying-requests-from-slack

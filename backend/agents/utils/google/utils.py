@@ -43,3 +43,7 @@ def get_credentials(
         with open(token_file, "w") as token:
             token.write(creds.to_json())
     return creds
+
+
+def create_workspace_crew(access_token):
+    pass

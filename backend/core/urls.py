@@ -10,7 +10,7 @@ urlpatterns = [
             [
                 path("", include("common.urls", namespace="common")),
                 path("", include("accounts.urls", namespace="accounts")),
-                path("slack/", include("bots.slackbot.urls", namespace="slackbot")),
+                path("bots/", include("bots.urls", namespace="bots")),
                 path("agents/", include("agents.urls", namespace="agents")),
             ]
         ),

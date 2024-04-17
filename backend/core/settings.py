@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     "common",
     "accounts",
     "agents",
-    "bots.slackbot",
+    "bots",
     
     # THIRD-PARTY AUTH APPS
     "social_django",
@@ -233,3 +233,6 @@ GOOGLE_SCOPES = [
 ]
 DEFAULT_CREDS_TOKEN_FILE = "token.json"
 DEFAULT_CLIENT_SECRETS_FILE = "credentials.json"
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
+GOOGLE_REDIRECT_URI = env("GOOGLE_REDIRECT_URI", default="")
