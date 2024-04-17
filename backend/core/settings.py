@@ -217,10 +217,19 @@ OTP_AUTH_TOKEN_LIFETIME_MINUTES = datetime.timedelta(minutes=env.int('OTP_AUTH_T
 OTP_VALIDATE_PATH = "/auth/validate-otp"
 
 
-# SLACK VARIABLES
+# SLACK CONFIGURATIONS
 SLACK_SCOPES = env("SLACK_SCOPES", default=[])
 SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
 SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 SLACK_EVENT_URL = env("SLACK_EVENT_URL", default="/slack/events")
 SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=300)
+
+# GOOGLE CONFIGURATIONS
+DISCOVERY_DOC = "https://forms.googleapis.com/$discovery/rest?version=v1"
+GOOGLE_SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/forms",
+]
+DEFAULT_CREDS_TOKEN_FILE = "token.json"
+DEFAULT_CLIENT_SECRETS_FILE = "credentials.json"
