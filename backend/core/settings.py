@@ -231,8 +231,8 @@ GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/forms",
 ]
-DEFAULT_CREDS_TOKEN_FILE = "token.json"
-DEFAULT_CLIENT_SECRETS_FILE = "credentials.json"
+DEFAULT_CREDS_TOKEN_FILE = BASE_DIR / "token.json"
+DEFAULT_CLIENT_SECRETS_FILE = BASE_DIR / "credentials.json"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
-GOOGLE_REDIRECT_URI = env("GOOGLE_REDIRECT_URI", default="")
+AGENT_REDIRECT_URI = env("AGENT_REDIRECT_URI", default="")

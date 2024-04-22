@@ -18,7 +18,7 @@ from common.models import State, ThirdParty
 
 from .utils import fetch_response, save_bot
 from .models import Bot
-from .serializers import BotSerializer
+from .serializers import BotSerializer, OAuthURLSerializer
 
 
 # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
@@ -32,6 +32,7 @@ authorize_url_generator = AuthorizeUrlGenerator(
 # Create your views here.
 class OAUTHView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = OAuthURLSerializer
 
     def get(self, request, thirdparty, agent_id, **kwargs):
         request.session["agent_id"] = agent_id
@@ -40,6 +41,7 @@ class OAUTHView(generics.GenericAPIView):
         if thirdparty == ThirdParty.SLACK:
             # https://slack.com/oauth/v2/authorize?state=(generated value)&client_id={client_id}&scope=app_mentions:read,chat:write&user_scope=search:read
             url = authorize_url_generator.generate(state)
+            serializer = self.serializer_class(data={"url": url})
             button = f'''<a href="{html.escape(url)}">
                 <img 
                     alt="Add to Slack" 
@@ -48,11 +50,12 @@ class OAUTHView(generics.GenericAPIView):
                     src="https://platform.slack-edge.com/img/add_to_slack.png" 
                     srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" />
             </a>'''
-        return {"button": button}
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class OAUTHCallbackView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
+    serializer_class = BotSerializer
 
     def get(self, request, **kwargs):
         # Retrieve the auth code and state from the request params
@@ -73,7 +76,7 @@ class OAUTHCallbackView(generics.GenericAPIView):
                 
                 bot = save_bot(agent, oauth_response, client)
 
-                serializer = BotSerializer(instance=bot)
+                serializer = self.get_serializer(instance=bot)
 
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:

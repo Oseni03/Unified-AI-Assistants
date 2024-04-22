@@ -1,5 +1,6 @@
 import datetime
 import io
+from typing import List
 import uuid
 from django.conf import settings
 from httplib2 import Http
@@ -15,13 +16,14 @@ class GoogleCalenderTools:
     def __init__(self, creds: Credentials) -> None:
         self.service = build("calender", "v3", credentials=creds)
 
-    @tool("Get list of calender events in google calender")
+    @tool
     def get_event_list(
         self,
         calender_id: str = "primary",
-        time: datetime = datetime.datetime.now(datetime.UTC).isoformat() + "Z",
+        time: datetime.datetime = datetime.datetime.now(datetime.UTC).isoformat() + "Z",
         max_result: int = 10,
     ):
+        """Get list of calender events in google calender"""
         print("Getting the upcoming 10 events")
         events_result = (
             self.service.events()
@@ -36,26 +38,40 @@ class GoogleCalenderTools:
         )
         events = events_result.get("items", [])
         return events
+    
+    def get_tools(self) -> List:
+        """Get the tools in the toolkit."""
+        return [
+            self.get_event_list,
+        ]
 
 
 class GoogleDocTools:
     def __init__(self, creds: Credentials) -> None:
         self.service = build("docs", "v1", credentials=creds)
 
-    @tool("Retrieve a document in google doc")
+    @tool
     def retrieve_document(self, document_id: int):
+        """Retrieve a document in google doc"""
         # Retrieve the documents contents from the Docs service.
         document = self.service.documents().get(documentId=document_id).execute()
         # to_json = json.dumps(document, indent=4, sort_keys=True)
         return document
+    
+    def get_tools(self) -> List:
+        """Get the tools in the toolkit."""
+        return [
+            self.retrieve_document,
+        ]
 
 
 class GoogleDriveTools:
     def __init__(self, creds: Credentials) -> None:
         self.service = build("drive", "v3", credentials=creds)
 
-    @tool("get list of files in google drive")
+    @tool
     def get_file_list(self, page_size=10):
+        """get list of files in google drive"""
         # Call the Drive v3 API
         results = (
             self.service.files()
@@ -65,7 +81,7 @@ class GoogleDriveTools:
         items = results.get("files", [])
         return items
 
-    @tool("Create a drive")
+    @tool
     def create_drive(self, name: str):
         """Create a drive.
         Returns:
@@ -583,6 +599,26 @@ class GoogleDriveTools:
             team_drives = None
 
         return team_drives
+    
+    def get_tools(self) -> List:
+        """Get the tools in the toolkit."""
+        return [
+            self.create_drive,
+            self.create_folder,
+            self.download_file,
+            self.create_team_drive,
+            self.export_pdf,
+            self.duplicate_file,
+            self.fetch_appdata_folder,
+            self.fetch_changes,
+            self.get_file_list,
+            self.list_appdata,
+            self.move_file_to_folder,
+            self.recover_drives,
+            self.search_file,
+            self.share_file,
+            self.upload_to_folder
+        ]
 
 
 # SCOPES = ["https://www.googleapis.com/auth/drive"]
@@ -613,7 +649,7 @@ class GoogleSheetTools:
 
     @tool
     def sheet_append_values(
-        self, spreadsheet_id, range_name, value_input_option, _values
+        self, spreadsheet_id, range_name, value_input_option, values
     ):
         """
         Creates the batch_update the user has access to.
@@ -622,7 +658,7 @@ class GoogleSheetTools:
             spreadsheet_id: Google sheet ID
             range_name: Google sheet range e.g "A1:C2"
             value_input_option: Sheet value option value e.g "USER_ENTERED"
-            _values: New sheet values e.g [["F", "B"], ["C", "D"]]
+            values: New sheet values e.g [["F", "B"], ["C", "D"]]
         """
         try:
             values = [
@@ -631,9 +667,6 @@ class GoogleSheetTools:
                 ],
                 # Additional rows ...
             ]
-            # [START_EXCLUDE silent]
-            values = _values
-            # [END_EXCLUDE]
             body = {"values": values}
             result = (
                 self.service.spreadsheets()
@@ -646,12 +679,13 @@ class GoogleSheetTools:
                 )
                 .execute()
             )
+            print(result)
             print(f"{(result.get('updates').get('updatedCells'))} cells appended.")
             return result
 
         except HttpError as error:
             print(f"An error occurred: {error}")
-            return error
+            return None
 
     @tool
     def sheet_get_values(self, spreadsheet_id, range_name):
@@ -675,20 +709,17 @@ class GoogleSheetTools:
             return error
 
     @tool
-    def sheet_batch_get_values(self, spreadsheet_id, _range_names="A1:C2"):
+    def sheet_batch_get_values(self, spreadsheet_id, range_names="A1:C2"):
         """
         Get sheet batch values
         Args:
             spreadsheet_id: Google sheet ID
-            _range_names: Google sheet ranges names
+            range_names: Google sheet ranges names
         """
         try:
             range_names = [
                 # Range names ...
             ]
-            # [START_EXCLUDE silent]
-            range_names = _range_names
-            # [END_EXCLUDE]
             result = (
                 self.service.spreadsheets()
                 .values()
@@ -753,7 +784,7 @@ class GoogleSheetTools:
             return error
 
     @tool
-    def update_values(self, spreadsheet_id, range_name, value_input_option, _values):
+    def update_values(self, spreadsheet_id, range_name, value_input_option, values):
         """
         Update sheet values
         Args:
@@ -769,9 +800,6 @@ class GoogleSheetTools:
                 ],
                 # Additional rows ...
             ]
-            # [START_EXCLUDE silent]
-            values = _values
-            # [END_EXCLUDE]
             body = {"values": values}
             result = (
                 self.service.spreadsheets()
@@ -792,7 +820,7 @@ class GoogleSheetTools:
 
     @tool
     def batch_update_values(
-        self, spreadsheet_id, range_name, value_input_option, _values
+        self, spreadsheet_id, range_name, value_input_option, values
     ):
         """
         Batch update sheet values
@@ -803,15 +831,12 @@ class GoogleSheetTools:
             _values: New updated values e.g [["A", "B"], ["C", "D"]]
         """
         try:
-            values = [
-                [
-                    # Cell values ...
-                ],
-                # Additional rows
-            ]
-            # [START_EXCLUDE silent]
-            values = _values
-            # [END_EXCLUDE]
+            # values = [
+            #     [
+            #         # Cell values ...
+            #     ],
+            #     # Additional rows
+            # ]
             data = [
                 {"range": range_name, "values": values},
                 # Additional ranges to update ...
@@ -915,6 +940,19 @@ class GoogleSheetTools:
         except HttpError as error:
             print(f"An error occurred: {error}")
             return error
+    
+    def get_tools(self) -> List:
+        """Get the tools in the toolkit."""
+        return [
+            self.create_sheet,
+            self.sheet_append_values,
+            self.sheet_get_values,
+            self.sheet_batch_get_values,
+            self.sheets_batch_update,
+            self.update_values,
+            self.batch_update_values,
+            self.pivot_tables
+        ]
 
 
 class GoogleFormTools:

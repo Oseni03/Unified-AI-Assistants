@@ -13,6 +13,8 @@ class Agent(AbstractBaseModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents", null=True)
     name = models.CharField(max_length=255, default="AI assistant")
     access_token = models.CharField(max_length=255)
+    refresh_token = models.CharField(max_length=255, null=True)
+    token_uri = models.CharField(max_length=255, null=True)
     id_token = models.CharField(max_length=255)
     thirdparty = models.CharField(max_length=25, choices=ThirdParty.choices)
     is_public = models.BooleanField(default=False)

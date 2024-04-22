@@ -11,7 +11,7 @@ from common.models import AbstractBaseModel
 
 # Create your models here.
 class Bot(AbstractBaseModel):
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="slackbots")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="bots")
     app_id = models.CharField(max_length=255, null=True)
     user_id = models.CharField(max_length=255)
     enterprise_id = models.CharField(max_length=255, null=True)
