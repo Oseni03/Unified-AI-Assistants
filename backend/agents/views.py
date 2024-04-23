@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from rest_framework import status, generics, permissions
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 
 from agents.utils.google.utils import google_oauth, google_oauth_callback
 
-from .models import Agent
+from .models import Agent, FeedBack
 from .serializers import AgentSerializer, FeedBackSerializer
 from .utils.google.utils import get_agent
 from common.models import State, ThirdParty
@@ -24,10 +24,19 @@ class AgentViewset(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         return serializer.save(user=self.request.user)
 
-    @action(methods=["post"], detail=True, serializer_class=FeedBackSerializer)
-    def feedback(self, request, *args, **kwargs):
-        serializer = FeedBackSerializer(request.data)
-        serializer.save(agent=self.get_object())
+    @action(methods=["post", "update", "delete"], detail=True, serializer_class=FeedBackSerializer)
+    def feedback(self, request, id=None, *args, **kwargs):
+        if request.method == "POST":
+            serializer = FeedBackSerializer(data=request.data)
+            serializer.save(agent=self.get_object())
+        elif request.method == "PUT":
+            feedback = get_object_or_404(FeedBack, id=id)
+            serializer = FeedBackSerializer(feedback, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+        elif request.method == "DELETE":
+            feedback = get_object_or_404(FeedBack, id=id).delete()
+            return Response({}, status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
