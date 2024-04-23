@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from langchain.agents.agent import AgentExecutor
 
+from accounts.models import User
 from common.models import AbstractBaseModel, ThirdParty
 
 
@@ -25,3 +26,14 @@ class Agent(AbstractBaseModel):
     
     def invoke(self, input):
         pass
+
+
+class FeedBack(AbstractBaseModel):
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="feedbacks")
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="feedbacks")
+    message = models.TextField()
+    like = models.BooleanField(default=False)
+    dislike = models.BooleanField(default=False)
+
+    def __str__(self):
+        return str(f"Agent: {self.id} - By: {self.user}")

@@ -26,10 +26,11 @@ class CreateUserView(generics.CreateAPIView):
 
 class UserAccountConfirmationView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
+    serializer_class = serializers.UserAccountConfirmationSerializer
     
     def get(self, request, user, token, format=None):
         data = {"user": user, "token": token}
-        serializer = serializers.UserAccountConfirmationSerializer(data=data)
+        serializer = self.get_serializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)

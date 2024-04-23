@@ -2,30 +2,33 @@ from django.conf import settings
 
 from django.shortcuts import redirect
 from rest_framework import status, generics, permissions
+from rest_framework import viewsets
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 from agents.utils.google.utils import google_oauth, google_oauth_callback
 
 from .models import Agent
-from .serializers import AgentSerializer
+from .serializers import AgentSerializer, FeedBackSerializer
 from .utils.google.utils import get_agent
 from common.models import State, ThirdParty
 
 # Create your views here.
-class AgentListCreateView(generics.ListAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+class AgentViewset(viewsets.ModelViewSet):
     serializer_class = AgentSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return Agent.objects.filter(user=self.request.user)
-
-
-class AgentRetrieveUpdateView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [permissions.IsAuthenticated]
-    serializer_class = AgentSerializer
     
-    def get_queryset(self):
-        return Agent.objects.filter(user=self.request.user)
+    def perform_create(self, serializer):
+        return serializer.save(user=self.request.user)
+
+    @action(methods=["post"], detail=True, serializer_class=FeedBackSerializer)
+    def feedback(self, request, *args, **kwargs):
+        serializer = FeedBackSerializer(request.data)
+        serializer.save(agent=self.get_object())
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class OAuthAPIView(generics.GenericAPIView):
