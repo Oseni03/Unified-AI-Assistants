@@ -59,13 +59,13 @@ def get_credentials(
     return creds
 
 
-credentials = get_credentials(
-    token_file="token.json",
-    scopes=["https://mail.google.com/"],
-    client_secrets_file=settings.DEFAULT_CLIENT_SECRETS_FILE,
-)
-api_resource = build_resource_service(credentials=credentials, service_name="gmail", service_version="v1")
-toolkit = GoogleDriveTools(creds=api_resource)
+# credentials = get_credentials(
+#     token_file="token.json",
+#     scopes=["https://mail.google.com/"],
+#     client_secrets_file=settings.DEFAULT_CLIENT_SECRETS_FILE,
+# )
+# api_resource = build_resource_service(credentials=credentials, service_name="gmail", service_version="v1")
+# toolkit = GoogleDriveTools(creds=api_resource)
 
 
 def google_oauth(thirdparty, gen_state, user_email):

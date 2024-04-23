@@ -20,7 +20,7 @@ SECRET_KEY = 'django-insecure-ps#8st!$_(#b$4p4dda9d_z4_h&1@qbs^95xyo%g5(^^je9(j5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 DOMAIN_URL = "http://localhost:8000"
 
@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
@@ -59,6 +60,9 @@ MIDDLEWARE = [
     
     # SOCIAL-DJANGO MIDDLEWARE 
     "social_django.middleware.SocialAuthExceptionMiddleware",
+    # DJANGO-CORS HEADERS
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -149,9 +153,19 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = True
 
 
-# CORS CONFIG 
-CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
+# DJANGO-CORS CONFIGURATIONS
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:3000",
+])
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',  # for localhost (REACT Default)
+    'http://192.168.0.50:3000',  # for network 
+    'http://localhost:8080',  # for localhost (Developlemt)
+    'http://192.168.0.50:8080',  # for network (Development)
+]
 
 
 REST_FRAMEWORK = {

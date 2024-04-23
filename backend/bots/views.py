@@ -18,7 +18,7 @@ from common.models import State, ThirdParty
 
 from .utils import fetch_response, save_bot
 from .models import Bot
-from .serializers import BotSerializer, OAuthURLSerializer
+from .serializers import BotSerializer, EventSerializer, OAuthURLSerializer
 
 
 # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
@@ -94,6 +94,7 @@ class EventView(generics.GenericAPIView):
     """ Token Lookup"""
 
     permission_classes = [permissions.AllowAny]
+    serializer_class = EventSerializer
 
     def post(self, request, **kwargs):
         print(request.data) 
@@ -169,5 +170,6 @@ class EventView(generics.GenericAPIView):
                 "mrkdwn": output_text,
             }
         }
+        serializer = self.get_serializer({"query": query, "response": output_text})
 
-        return Response(resp_data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)

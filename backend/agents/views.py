@@ -1,6 +1,3 @@
-import requests
-import google.oauth2.credentials
-import google_auth_oauthlib.flow
 from django.conf import settings
 
 from django.shortcuts import redirect
@@ -49,6 +46,7 @@ class OAuthAPIView(generics.GenericAPIView):
 
 class OAuthCallBackAPIView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AgentSerializer
 
     def get(self, request, **kwargs):
         # Ensure that the request is not a forgery and that the user sending
@@ -86,5 +84,5 @@ class OAuthCallBackAPIView(generics.GenericAPIView):
             # access_token = response.get("access_token")
             # id_token = response.get("id_token")
 
-        serializer = AgentSerializer(instance=agent)
+        serializer = self.get_serializer(instance=agent)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
