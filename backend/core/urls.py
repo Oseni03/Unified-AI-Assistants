@@ -10,7 +10,7 @@ urlpatterns = [
             [
                 path("", include("common.urls", namespace="common")),
                 path("", include("accounts.urls", namespace="accounts")),
-                path("bots/", include("bots.urls", namespace="bots")),
+                path("integrations/", include("integrations.urls", namespace="integrations")),
                 path("agents/", include("agents.urls", namespace="agents")),
             ]
         ),

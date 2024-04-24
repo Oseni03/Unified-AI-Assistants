@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     "common",
     "accounts",
     "agents",
-    "bots",
+    "integrations",
     
     # THIRD-PARTY AUTH APPS
     "social_django",

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from hashid_field import rest
 
 from .models import Agent, FeedBack
-from bots.serializers import BotSerializer
+from integrations.serializers import BotSerializer
 
 
 class AgentSerializer(serializers.ModelSerializer):

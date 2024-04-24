@@ -1,6 +1,8 @@
+from django.shortcuts import get_object_or_404
 from slack_sdk import WebClient
 
 from agents.models import Agent
+from accounts.models import User
 
 from .models import Bot
 
@@ -48,5 +50,7 @@ def save_bot(agent: Agent, oauth_response: dict, client: WebClient):
     return bot.save()
 
 
-def fetch_response(query: str):
-    pass
+def fetch_response(query: str, bot_id, user: User):
+    bot = get_object_or_404(Bot, bot_id=bot_id, user=user)
+    response = bot.agent.invoke(query)
+    return response
