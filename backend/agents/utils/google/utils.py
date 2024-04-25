@@ -10,9 +10,9 @@ from langchain_community.tools.gmail.utils import (
     import_installed_app_flow,
 )
 from langchain_community.tools.gmail.utils import build_resource_service
-# from langchain_community.agent_toolkits import GmailToolkit
+from langchain_community.agent_toolkits import GmailToolkit
 from langchain_community.agent_toolkits.gmail.toolkit import GmailToolkit
-# from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .tools import GoogleDriveTools, GoogleCalenderTools
 from common.models import ThirdParty
@@ -20,9 +20,9 @@ from agents.utils.main import create_agent, create_prompt
 
 GMAIL_SCOPES = ["https://mail.google.com/"]
 GOOGLE_CALENDER_SCOPES = ["https://www.googleapis.com/auth/calender"]
-# GeminiLLM = ChatGoogleGenerativeAI(
-#     model="gemini-pro", google_api_key=settings.GOOGLE_API_KEY
-# )
+GeminiLLM = ChatGoogleGenerativeAI(
+    model="gemini-pro", google_api_key=settings.GOOGLE_API_KEY
+)
 
 
 def get_credentials(

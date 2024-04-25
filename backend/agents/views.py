@@ -3,6 +3,7 @@ from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from rest_framework import status, generics, permissions
 from rest_framework import viewsets
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
@@ -40,7 +41,7 @@ class AgentViewset(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class OAuthAPIView(generics.GenericAPIView):
+class OAuthAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, thirdparty, **kwargs):
