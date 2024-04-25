@@ -5,28 +5,20 @@ import uuid
 from django.conf import settings
 
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 
 from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
-from slack_sdk.oauth import AuthorizeUrlGenerator
 
 from agents.models import Agent
 from common.models import State, ThirdParty
 
-from .utils import fetch_response, save_bot
+from .utils import fetch_response, save_bot, create_slack_installation_url
 from .models import Bot
 from .serializers import BotSerializer, EventSerializer, OAuthURLSerializer
-
-
-# Build https://slack.com/oauth/v2/authorize with sufficient query parameters
-authorize_url_generator = AuthorizeUrlGenerator(
-    client_id=settings.SLACK_CLIENT_ID,
-    scopes=settings.SLACK_SCOPES,
-    user_scopes=["search:read"],
-)
 
 
 # Create your views here.
@@ -40,7 +32,7 @@ class OAUTHView(generics.GenericAPIView):
         state = str(State.issue(thirdparty))
         if thirdparty == ThirdParty.SLACK:
             # https://slack.com/oauth/v2/authorize?state=(generated value)&client_id={client_id}&scope=app_mentions:read,chat:write&user_scope=search:read
-            url = authorize_url_generator.generate(state)
+            url = create_slack_installation_url(state)
             serializer = self.serializer_class(data={"url": url})
             button = f'''<a href="{html.escape(url)}">
                 <img 
@@ -57,30 +49,30 @@ class OAUTHCallbackView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = BotSerializer
 
-    def get(self, request, **kwargs):
-        # Retrieve the auth code and state from the request params
-        if "code" in request.args:
-            # Verify the state parameter
-            if State.consume(uuid.UUID(request.args["state"]).hex):
-                client = WebClient()  # no prepared token needed for this
-                # Complete the installation by calling oauth.v2.access API method
-                oauth_response = client.oauth_v2_access(
-                    client_id=settings.SLACK_CLIENT_ID,
-                    client_secret=settings.SLACK_CLIENT_SECRET,
-                    # redirect_uri=redirect_uri,
-                    code=request.args["code"]
-                )
+    def get(self, request, thirdparty, **kwargs):
+        if thirdparty == ThirdParty.SLACK:
+            # Retrieve the auth code and state from the request params
+            if "code" in request.args:
+                # Verify the state parameter
+                if State.consume(uuid.UUID(request.args["state"]).hex):
+                    client = WebClient()  # no prepared token needed for this
+                    agent_id = request.session.get("agent_id")
+                    # Complete the installation by calling oauth.v2.access API method
+                    oauth_response = client.oauth_v2_access(
+                        client_id=settings.SLACK_CLIENT_ID,
+                        client_secret=settings.SLACK_CLIENT_SECRET,
+                        redirect_uri=settings.DOMAIN_URL + reverse("integrations:oauth-callback", args=(ThirdParty.SLACK,)),
+                        code=request.args["code"]
+                    )
 
-                agent_id = request.session.get("agent_id")
-                agent = get_object_or_404(Agent, id=agent_id)
-                
-                bot = save_bot(agent, oauth_response, client)
+                    agent = get_object_or_404(Agent, id=agent_id)
+                    bot = save_bot(agent, oauth_response, client)
 
-                serializer = self.get_serializer(instance=bot)
+                    serializer = self.get_serializer(instance=bot)
 
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response({"message": "Try the installation again (the state value is already expired)"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+                else:
+                    return Response({"message": "Try the installation again (the state value is already expired)"}, status=status.HTTP_400_BAD_REQUEST)
 
         error = request.args["error"] if "error" in request.args else ""
         return Response(f"Something is wrong with the installation (error: {html.escape(error)})", status=status.HTTP_400_BAD_REQUEST)

@@ -232,7 +232,17 @@ OTP_VALIDATE_PATH = "/auth/validate-otp"
 
 
 # SLACK CONFIGURATIONS
-SLACK_SCOPES = env("SLACK_SCOPES", default=[])
+SLACK_SCOPES = env("SLACK_SCOPES", default=[
+    "chat:write",
+    "channels:read",
+    "groups:read",
+    "in:read",
+    "channels:manage",
+    "group:write",
+    "in:write",
+    "apin:write",
+    "channels:join",
+])
 SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
 SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")

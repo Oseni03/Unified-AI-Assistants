@@ -4,7 +4,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.db import models
 
-from slack_sdk.oauth.installation_store.models.bot import Bot
+from slack_sdk.oauth.installation_store.models.bot import Bot as SlackBot
 
 from agents.models import Agent
 from common.models import AbstractBaseModel
@@ -19,12 +19,12 @@ class Bot(AbstractBaseModel):
     enterprise_url = models.CharField(max_length=255, null=True)
     team_id = models.CharField(max_length=255, null=True)
     team_name = models.CharField(max_length=255, null=True)
-    bot_token = models.CharField(max_length=255, null=True)
+    access_token = models.CharField(max_length=255, null=True)
     bot_id = models.CharField(max_length=255, null=True)
     bot_user_id = models.CharField(max_length=255, null=True)
     bot_scopes = models.CharField(max_length=500, null=True, help_text="Comma separated string")
     bot_refresh_token = models.CharField(max_length=255, null=True, help_text="Only when token rotation is enabled")
-    bot_token_expires_at = models.DateTimeField(null=True)
+    access_token_expires_in = models.DateTimeField(null=True)
     user_token = models.CharField(max_length=255, null=True)
     user_scopes = models.CharField(max_length=500, null=True, help_text="Comma separated string")
     user_refresh_token = models.CharField(max_length=255, null=True, help_text="Only when token rotation is enabled")
@@ -49,16 +49,12 @@ class Bot(AbstractBaseModel):
         team_id,
         team_name,
         # bot
-        bot_token,
+        access_token,
         bot_id,
         bot_user_id,
         bot_scopes,
         bot_refresh_token,  # only when token rotation is enabled
-        # only when token rotation is enabled
-        bot_token_expires_in,
-        # only for duplicating this object
-        # only when token rotation is enabled
-        bot_token_expires_at,
+        access_token_expires_in,
         # installer
         user_id: str,
         user_token,
@@ -87,7 +83,7 @@ class Bot(AbstractBaseModel):
         self.enterprise_url = enterprise_url
         self.team_id = team_id
         self.team_name = team_name
-        self.bot_token = bot_token
+        self.access_token = access_token
         self.bot_id = bot_id
         self.bot_user_id = bot_user_id
         if isinstance(bot_scopes, list):
@@ -96,7 +92,7 @@ class Bot(AbstractBaseModel):
         else:
             self.bot_scopes = bot_scopes
         self.bot_refresh_token = bot_refresh_token
-        self.bot_token_expires_at = bot_token_expires_at
+        self.access_token_expires_in = access_token_expires_in
 
         self.user_id = user_id
         self.user_token = user_token
@@ -123,19 +119,19 @@ class Bot(AbstractBaseModel):
 
         self.custom_values = custom_values if custom_values is not None else {}
 
-    def to_bot(self) -> Bot:
-        return Bot(
+    def to_bot(self) -> SlackBot:
+        return SlackBot(
             app_id=self.app_id,
             enterprise_id=self.enterprise_id,
             enterprise_name=self.enterprise_name,
             team_id=self.team_id,
             team_name=self.team_name,
-            bot_token=self.bot_token,
+            bot_token=self.access_token,
             bot_id=self.bot_id,
             bot_user_id=self.bot_user_id,
             bot_scopes=self.bot_scopes,
             bot_refresh_token=self.bot_refresh_token,
-            bot_token_expires_at=self.bot_token_expires_at,
+            bot_token_expires_at=self.access_token_expires_in,
             is_enterprise_install=self.is_enterprise_install,
             installed_at=self.installed_at,
             custom_values=self.custom_values,
@@ -155,13 +151,13 @@ class Bot(AbstractBaseModel):
             "enterprise_url": self.enterprise_url,
             "team_id": self.team_id,
             "team_name": self.team_name,
-            "bot_token": self.bot_token,
+            "access_token": self.access_token,
             "bot_id": self.bot_id,
             "bot_user_id": self.bot_user_id,
             "bot_scopes": ",".join(self.bot_scopes) if self.bot_scopes else None,
             "bot_refresh_token": self.bot_refresh_token,
-            "bot_token_expires_at": self.bot_token_expires_at
-            if self.bot_token_expires_at is not None
+            "access_token_expires_in": self.access_token_expires_in
+            if self.access_token_expires_in is not None
             else None,
             "user_id": self.user_id,
             "user_token": self.user_token,
