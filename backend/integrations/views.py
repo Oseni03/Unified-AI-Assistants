@@ -1,13 +1,13 @@
 import html
-import json
 import uuid
 
 from django.conf import settings
-
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
-from rest_framework import status, generics, permissions
+
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status, generics, permissions
 
 from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
@@ -17,89 +17,94 @@ from agents.models import Agent
 from common.models import State, ThirdParty
 
 from .utils import fetch_response, save_bot, create_slack_installation_url
-from .models import Bot
-from .serializers import BotSerializer, EventSerializer, OAuthURLSerializer
+from .models import Bot, Integration
+from .serializers import BotSerializer, EventSerializer
 
 
 # Create your views here.
-class OAUTHView(generics.GenericAPIView):
+class OAUTHView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = OAuthURLSerializer
 
     def get(self, request, thirdparty, agent_id, **kwargs):
         request.session["agent_id"] = agent_id
         # Generate a random value and store it on the server-side
-        state = str(State.issue(thirdparty))
-        if thirdparty == ThirdParty.SLACK:
-            # https://slack.com/oauth/v2/authorize?state=(generated value)&client_id={client_id}&scope=app_mentions:read,chat:write&user_scope=search:read
-            url = create_slack_installation_url(state)
-            serializer = self.serializer_class(data={"url": url})
-            button = f'''<a href="{html.escape(url)}">
-                <img 
-                    alt="Add to Slack" 
-                    height="40" 
-                    width="139" 
-                    src="https://platform.slack-edge.com/img/add_to_slack.png" 
-                    srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" />
-            </a>'''
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        state = State().issue(thirdparty)
+        request.session["thirdparty"] = thirdparty  # Add to the session
+        request.session["state"] = state  # Add to the session
+
+        integration = Integration.objects.get(thirdparty=thirdparty)
+        auth_url = integration.get_oauth_url(state=state, user_email=request.user.email)
+        print(auth_url)
+        return redirect(auth_url)
 
 
 class OAUTHCallbackView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = BotSerializer
 
-    def get(self, request, thirdparty, **kwargs):
-        if thirdparty == ThirdParty.SLACK:
-            # Retrieve the auth code and state from the request params
-            if "code" in request.args:
-                # Verify the state parameter
-                if State.consume(uuid.UUID(request.args["state"]).hex):
-                    client = WebClient()  # no prepared token needed for this
-                    agent_id = request.session.get("agent_id")
-                    # Complete the installation by calling oauth.v2.access API method
-                    oauth_response = client.oauth_v2_access(
-                        client_id=settings.SLACK_CLIENT_ID,
-                        client_secret=settings.SLACK_CLIENT_SECRET,
-                        redirect_uri=settings.DOMAIN_URL + reverse("integrations:oauth-callback", args=(ThirdParty.SLACK,)),
-                        code=request.args["code"]
-                    )
+    def get(self, request, **kwargs):
+        try:
+            # Ensure that the request is not a forgery and that the user sending
+            # this connect request is the expected user.
+            state = request.GET.get("state", "")
+            code = request.GET.get("code", "")
 
-                    agent = get_object_or_404(Agent, id=agent_id)
-                    bot = save_bot(agent, oauth_response, client)
+            gen_state = request.session.get("state")
+            thirdparty = request.session.get("thirdparty")
+            agent_id = request.session.get("agent_id")
 
-                    serializer = self.get_serializer(instance=bot)
+            print(
+                f"State: {state}\nCode: {code}\nThirdparty: {thirdparty}\nAgent-ID: {agent_id}"
+            )
 
-                    return Response(serializer.data, status=status.HTTP_200_OK)
-                else:
-                    return Response({"message": "Try the installation again (the state value is already expired)"}, status=status.HTTP_400_BAD_REQUEST)
+            if not (state == gen_state):
+                return Response(
+                    "Invalid state parameter.", status=status.HTTP_401_UNAUTHORIZED
+                )
 
-        error = request.args["error"] if "error" in request.args else ""
-        return Response(f"Something is wrong with the installation (error: {html.escape(error)})", status=status.HTTP_400_BAD_REQUEST)
-    
+            State.consume(state)
+
+            integration = Integration.objects.get(thirdparty=thirdparty)
+            client = WebClient()
+            oauth_response = integration.handle_oauth_callback(
+                state, code, client=client
+            )
+
+            agent = get_object_or_404(Agent, id=agent_id)
+            bot = save_bot(agent, oauth_response, client)
+
+            serializer = self.get_serializer(instance=bot)
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except:
+            error = request.GET.get("error", "")
+            return Response(
+                f"Something is wrong with the installation (error: {html.escape(error)})",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 signature_verifier = SignatureVerifier(signing_secret=settings.SLACK_SIGNING_SECRET)
 
 
 class EventView(generics.GenericAPIView):
-    """ Token Lookup"""
+    """Token Lookup"""
 
     permission_classes = [permissions.AllowAny]
     serializer_class = EventSerializer
 
     def post(self, request, **kwargs):
-        print(request.data) 
+        print(request.data)
 
         # Verify incoming requests from Slack
         # https://api.slack.com/authentication/verifying-requests-from-slack
         if not signature_verifier.is_valid(
             body=request.get_data(),
             timestamp=request.headers.get("X-Slack-Request-Timestamp"),
-            signature=request.headers.get("X-Slack-Signature")):
+            signature=request.headers.get("X-Slack-Signature"),
+        ):
             return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
 
-            
         print(request.form)
         print(request.data)
 
@@ -107,7 +112,7 @@ class EventView(generics.GenericAPIView):
         enterprise_id = request.form.get("enterprise_id")
         # The workspace's ID
         team_id = request.form["team_id"]
-        
+
         # Lookup the stored bot token for this workspace
         bot = Bot.objects.filter(
             enterprise_id=enterprise_id,
@@ -122,45 +127,43 @@ class EventView(generics.GenericAPIView):
         bot_id = client.api_call("auth.test")["user_id"]
         trigger_id = request.form["trigger_id"]
 
-        channel_id = request.form['channel']
-        thread_ts = request.form['ts']
+        channel_id = request.form["channel"]
+        thread_ts = request.form["ts"]
         user_id = request.form["user"]
         query = request.form.get("text")
 
-        if user_id == bot_id: # OR if request.form.get('subtype') == 'bot_message':
+        if user_id == bot_id:  # OR if request.form.get('subtype') == 'bot_message':
             return Response({}, status=status.HTTP_200_OK)
 
         # Post an initial message
-        result = client.chat_postpayload(channel=channel_id, text=":mag: Searching...", thread_ts=thread_ts)
+        result = client.chat_postpayload(
+            channel=channel_id, text=":mag: Searching...", thread_ts=thread_ts
+        )
         thread_ts = result["ts"]
-        
+
         # Fetch response using RemoteRunnable
         response = fetch_response(query)
 
         # Process response and send follow-up message
-        output_text = response['output']  # Adjust according to your actual response structure
+        output_text = response[
+            "output"
+        ]  # Adjust according to your actual response structure
 
-        #Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
+        # Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
         client.chat_update(
             channel=channel_id,
             ts=thread_ts,
             text=output_text,
             blocks=[
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": output_text
-                    }
-                }
-            ]
+                {"type": "section", "text": {"type": "mrkdwn", "text": output_text}}
+            ],
         )
 
         resp_data = {
             "query": query,
             "response": {
                 "mrkdwn": output_text,
-            }
+            },
         }
         serializer = self.get_serializer({"query": query, "response": output_text})
 

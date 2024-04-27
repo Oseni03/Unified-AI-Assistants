@@ -1,15 +1,86 @@
+import google_auth_oauthlib
+
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 from uuid import uuid4
+
 from django.conf import settings
 from django.db import models
 
 from slack_sdk.oauth.installation_store.models.bot import Bot as SlackBot
+from slack_sdk.oauth import AuthorizeUrlGenerator
+from slack_sdk import WebClient
 
 from agents.models import Agent
-from common.models import AbstractBaseModel
+from common.models import AbstractBaseModel, ThirdParty
+
 
 # Create your models here.
+class Integration(AbstractBaseModel):
+    thirdparty = models.CharField(
+        max_length=50, unique=True, choices=ThirdParty.choices
+    )
+    is_chat_app = models.BooleanField(help_text="Is it a messaging app integration or other thirdparty integration")
+    is_active = models.BooleanField(default=True)
+    scopes = models.TextField(help_text="Comma separated scope")
+
+    def __str__(self):
+        return self.thirdparty.title()
+    
+    def get_oauth_url(self, state: str, user_email: str) -> str:
+        if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+            flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+                settings.DEFAULT_CLIENT_SECRETS_FILE,
+                scopes = self.get_scopes()
+            )
+            flow.redirect_uri = settings.AGENT_REDIRECT_URI
+            auth_url, _ = flow.authorization_url(
+                access_type="offline",
+                include_granted_scopes="true",
+                state=state,
+                login_hint=user_email,
+                prompt="consent"
+            )
+        elif self.thirdparty == ThirdParty.SLACK:
+            # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
+            authorize_url_generator = AuthorizeUrlGenerator(
+                client_id = settings.SLACK_CLIENT_ID,
+                scopes = self.get_scopes(), # settings.SLACK_SCOPES,
+                # user_scopes=["search:read"],
+                redirect_uri=settings.AGENT_REDIRECT_URI
+            )
+            auth_url = authorize_url_generator.generate(state)
+        return auth_url
+    
+    def handle_oauth_callback(self, state: str, code: str, client: WebClient = None):
+        if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+            flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+                settings.DEFAULT_CLIENT_SECRETS_FILE,
+                scopes = self.get_scopes(),
+                state=state
+            )
+            redirect_uri = settings.AGENT_REDIRECT_URI
+            print(f"Redirect URI: {redirect_uri}")
+            flow.redirect_uri = redirect_uri
+            flow.fetch_token(code=code)
+            credentials = flow.credentials
+            return credentials
+        
+        elif self.thirdparty == ThirdParty.SLACK:  # no prepared token needed for this
+            # Complete the installation by calling oauth.v2.access API method
+            oauth_response = client.oauth_v2_access(
+                client_id=settings.SLACK_CLIENT_ID,
+                client_secret=settings.SLACK_CLIENT_SECRET,
+                redirect_uri=settings.AGENT_REDIRECT_URI,
+                code=code
+            )
+            return oauth_response
+    
+    def get_scopes(self):
+        scopes = [scope.strip() for scope in self.scopes.split(",")]
+        return scopes
+
+
 class Bot(AbstractBaseModel):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="bots")
     app_id = models.CharField(max_length=255, null=True)
@@ -22,12 +93,20 @@ class Bot(AbstractBaseModel):
     access_token = models.CharField(max_length=255, null=True)
     bot_id = models.CharField(max_length=255, null=True)
     bot_user_id = models.CharField(max_length=255, null=True)
-    bot_scopes = models.CharField(max_length=500, null=True, help_text="Comma separated string")
-    bot_refresh_token = models.CharField(max_length=255, null=True, help_text="Only when token rotation is enabled")
+    bot_scopes = models.CharField(
+        max_length=500, null=True, help_text="Comma separated string"
+    )
+    bot_refresh_token = models.CharField(
+        max_length=255, null=True, help_text="Only when token rotation is enabled"
+    )
     access_token_expires_in = models.DateTimeField(null=True)
     user_token = models.CharField(max_length=255, null=True)
-    user_scopes = models.CharField(max_length=500, null=True, help_text="Comma separated string")
-    user_refresh_token = models.CharField(max_length=255, null=True, help_text="Only when token rotation is enabled")
+    user_scopes = models.CharField(
+        max_length=500, null=True, help_text="Comma separated string"
+    )
+    user_refresh_token = models.CharField(
+        max_length=255, null=True, help_text="Only when token rotation is enabled"
+    )
     user_token_expires_at = models.DateTimeField(null=True)
     incoming_webhook_url = models.CharField(max_length=255, null=True)
     incoming_webhook_channel = models.CharField(max_length=255, null=True)
@@ -101,7 +180,7 @@ class Bot(AbstractBaseModel):
         else:
             self.user_scopes = user_scopes
         self.user_refresh_token = user_refresh_token
-        
+
         self.user_token_expires_at = user_token_expires_at
 
         self.incoming_webhook_url = incoming_webhook_url
@@ -156,16 +235,20 @@ class Bot(AbstractBaseModel):
             "bot_user_id": self.bot_user_id,
             "bot_scopes": ",".join(self.bot_scopes) if self.bot_scopes else None,
             "bot_refresh_token": self.bot_refresh_token,
-            "access_token_expires_in": self.access_token_expires_in
-            if self.access_token_expires_in is not None
-            else None,
+            "access_token_expires_in": (
+                self.access_token_expires_in
+                if self.access_token_expires_in is not None
+                else None
+            ),
             "user_id": self.user_id,
             "user_token": self.user_token,
             "user_scopes": self.user_scopes.split(" , ") if self.user_scopes else None,
             "user_refresh_token": self.user_refresh_token,
-            "user_token_expires_at": self.user_token_expires_at
-            if self.user_token_expires_at is not None
-            else None,
+            "user_token_expires_at": (
+                self.user_token_expires_at
+                if self.user_token_expires_at is not None
+                else None
+            ),
             "incoming_webhook_url": self.incoming_webhook_url,
             "incoming_webhook_channel": self.incoming_webhook_channel,
             "incoming_webhook_channel_id": self.incoming_webhook_channel_id,
@@ -177,4 +260,3 @@ class Bot(AbstractBaseModel):
         # prioritize standard_values over custom_values
         # when the same keys exist in both
         return {**self.custom_values, **standard_values}
-

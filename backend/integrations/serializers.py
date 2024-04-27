@@ -12,10 +12,6 @@ class BotSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class OAuthURLSerializer(serializers.Serializer):
-    url = serializers.URLField(read_only=True)
-
-
 class EventSerializer(serializers.Serializer):
     query = serializers.CharField()
     response = serializers.CharField(read_only=True)
