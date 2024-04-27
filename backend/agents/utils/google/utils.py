@@ -1,6 +1,7 @@
 import os
 from typing import List, Optional
 
+from django.urls import reverse
 import google_auth_oauthlib
 from django.conf import settings
 from google.oauth2.credentials import Credentials
@@ -90,33 +91,43 @@ def google_oauth(thirdparty, gen_state, user_email):
     return auth_url, state
 
 
-def google_oauth_callback(thirdparty, state):
+def google_oauth_callback(thirdparty, state, code):
     if thirdparty == ThirdParty.GMAIL:
-        flow = google_auth_oauthlib.flow.Flow.from_client_config().from_client_secrets_file(
+        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
             settings.DEFAULT_CLIENT_SECRETS_FILE,
             scopes = GMAIL_SCOPES,
             state=state
         )
     elif thirdparty == ThirdParty.GOOGLE_CALENDER:
-        flow = google_auth_oauthlib.flow.Flow.from_client_config().from_client_secrets_file(
+        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
             settings.DEFAULT_CLIENT_SECRETS_FILE,
             scopes = GOOGLE_CALENDER_SCOPES,
             state=state
         )
-    flow.redirect_uri = settings.AGENT_REDIRECT_URI
+    redirect_uri = settings.AGENT_REDIRECT_URI
+    print(f"Redirect URI: {redirect_uri}")
+    flow.redirect_uri = redirect_uri
+    flow.fetch_token(code=code)
     credentials = flow.credentials
     return credentials
 
 
-def get_agent(thirdparty: ThirdParty):
+def credentials_to_dict(credentials):
+  return {'token': credentials.token,
+          'refresh_token': credentials.refresh_token,
+          'token_uri': credentials.token_uri,
+          'client_id': credentials.client_id,
+          'client_secret': credentials.client_secret,
+          'scopes': credentials.scopes}
+
+
+def get_agent(thirdparty: ThirdParty, credential: Credentials):
     tools = []
 
     if thirdparty == ThirdParty.GMAIL:
-        credential = None
         toolkit = GmailToolkit()
         toolkit.api_resource = credential
     elif thirdparty == ThirdParty.GOOGLE_CALENDER:
-        credential = None
         toolkit = GoogleCalenderTools(credential)
     tools = toolkit.get_tools()
     prompt = create_prompt()

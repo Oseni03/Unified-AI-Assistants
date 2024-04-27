@@ -1,9 +1,13 @@
+import os
 import environ
 import datetime
 from pathlib import Path
+from urllib.parse import urljoin
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Take environment variables from .env file
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 env = environ.Env(
     # set casting, default value
@@ -22,7 +26,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-DOMAIN_URL = "http://localhost:8000"
+# DOMAIN_URL = "http://localhost:8000"
+DOMAIN_URL = "https://211c-213-255-128-166.ngrok-free.app"
 
 
 # Application definition
@@ -159,12 +164,14 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
     "http://127.0.0.1:8000",
     "http://127.0.0.1:3000",
+    "https://211c-213-255-128-166.ngrok-free.app",
 ])
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',  # for localhost (REACT Default)
     'http://192.168.0.50:3000',  # for network 
     'http://localhost:8080',  # for localhost (Developlemt)
     'http://192.168.0.50:8080',  # for network (Development)
+    'https://211c-213-255-128-166.ngrok-free.app',  
 ]
 
 
@@ -247,7 +254,7 @@ SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
 SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
 SLACK_EVENT_URL = env("SLACK_EVENT_URL", default="/slack/events")
-SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=300)
+SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=3000)
 
 # GOOGLE CONFIGURATIONS
 DISCOVERY_DOC = "https://forms.googleapis.com/$discovery/rest?version=v1"
@@ -259,5 +266,5 @@ DEFAULT_CREDS_TOKEN_FILE = BASE_DIR / "token.json"
 DEFAULT_CLIENT_SECRETS_FILE = BASE_DIR / "credentials.json"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
-AGENT_REDIRECT_URI = env("AGENT_REDIRECT_URI", default="")
+AGENT_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/agents/oauth/callback")
 GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")
