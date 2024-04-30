@@ -1,7 +1,15 @@
 from rest_framework import serializers
 from hashid_field import rest
 
-from .models import Bot
+from .models import Bot, Integration
+
+
+class IntegrationSerializer(serializers.ModelSerializer):
+    id = rest.HashidSerializerCharField(read_only=True)
+
+    class Meta:
+        model = Integration
+        fields = ("id", "thirdparty", "is_chat_app", "created_at")
 
 
 class BotSerializer(serializers.ModelSerializer):
