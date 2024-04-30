@@ -5,11 +5,10 @@ from django.urls import reverse
 from slack_sdk import WebClient
 from slack_sdk.oauth import AuthorizeUrlGenerator
 
-from agents.models import Agent
 from accounts.models import User
 from common.models import ThirdParty
 
-from .models import Bot
+from .models import Bot, Agent
 
 
 def save_bot(agent: Agent, oauth_response: dict, client: WebClient):

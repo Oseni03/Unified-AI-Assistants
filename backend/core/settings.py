@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "accounts",
     "agents",
     "integrations",
+    "feedbacks",
     
     # THIRD-PARTY AUTH APPS
     "social_django",
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
@@ -183,6 +185,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ),
     "DEFAULT_THROTTLE_RATES": {"anon": "100/day"},
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 }
 
 SIMPLE_JWT = {

@@ -13,13 +13,12 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
 
-from agents.models import Agent
 from agents.utils.google.utils import credentials_to_dict
 from agents.serializers import AgentSerializer
-from common.models import State, ThirdParty
+from common.models import State
 
 from .utils import fetch_response, save_bot, create_slack_installation_url
-from .models import Bot, Integration
+from .models import Bot, Integration, Agent
 from .serializers import BotSerializer, EventSerializer
 
 
@@ -41,7 +40,7 @@ class OAUTHView(APIView):
         return redirect(auth_url)
 
 
-class OAUTHCallbackView(generics.GenericAPIView):
+class OAUTHCallbackView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, **kwargs):
