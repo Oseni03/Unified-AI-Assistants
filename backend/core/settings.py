@@ -27,7 +27,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 # DOMAIN_URL = "http://localhost:8000"
-DOMAIN_URL = "https://211c-213-255-128-166.ngrok-free.app"
+DOMAIN_URL = "https://adequate-adequately-husky.ngrok-free.app"
 
 
 # Application definition
@@ -164,14 +164,14 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
     "http://127.0.0.1:8000",
     "http://127.0.0.1:3000",
-    "https://211c-213-255-128-166.ngrok-free.app",
+    "https://adequate-adequately-husky.ngrok-free.app",
 ])
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',  # for localhost (REACT Default)
     'http://192.168.0.50:3000',  # for network 
     'http://localhost:8080',  # for localhost (Developlemt)
     'http://192.168.0.50:8080',  # for network (Development)
-    'https://211c-213-255-128-166.ngrok-free.app',  
+    'https://adequate-adequately-husky.ngrok-free.app',  
 ]
 
 
@@ -231,6 +231,7 @@ SWAGGER_SETTINGS = {
 }
 
 HASHID_FIELD_SALT = env("HASHID_FIELD_SALT", default="haaga82@#*?!")
+HASHID_FIELD_ENABLE_HASHID_OBJECT  = False
 
 OTP_AUTH_ISSUER_NAME = env("OTP_AUTH_ISSUER_NAME", default="")
 OTP_AUTH_TOKEN_COOKIE = 'otp_auth_token'
@@ -258,10 +259,8 @@ SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=3
 
 # GOOGLE CONFIGURATIONS
 DISCOVERY_DOC = "https://forms.googleapis.com/$discovery/rest?version=v1"
-GOOGLE_SCOPES = [
-    "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/forms",
-]
+GOOGLE_GMAIL_SCOPES = ["https://mail.google.com/"]
+GOOGLE_CALENDER_SCOPES = ["https://www.googleapis.com/auth/calender"]
 DEFAULT_CREDS_TOKEN_FILE = BASE_DIR / "token.json"
 DEFAULT_CLIENT_SECRETS_FILE = BASE_DIR / "credentials.json"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")

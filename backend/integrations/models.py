@@ -7,11 +7,12 @@ from uuid import uuid4
 from django.conf import settings
 from django.db import models
 
+from langchain.agents.agent import AgentExecutor
+import google.oauth2.credentials
 from slack_sdk.oauth.installation_store.models.bot import Bot as SlackBot
 from slack_sdk.oauth import AuthorizeUrlGenerator
 from slack_sdk import WebClient
 
-from agents.models import Agent
 from common.models import AbstractBaseModel, ThirdParty
 
 
@@ -22,16 +23,15 @@ class Integration(AbstractBaseModel):
     )
     is_chat_app = models.BooleanField(help_text="Is it a messaging app integration or other thirdparty integration")
     is_active = models.BooleanField(default=True)
-    scopes = models.TextField(help_text="Comma separated scope")
 
     def __str__(self):
-        return self.thirdparty.title()
+        return self.thirdparty.title
     
     def get_oauth_url(self, state: str, user_email: str) -> str:
         if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
             flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
                 settings.DEFAULT_CLIENT_SECRETS_FILE,
-                scopes = self.get_scopes()
+                scopes = self.scopes,
             )
             flow.redirect_uri = settings.AGENT_REDIRECT_URI
             auth_url, _ = flow.authorization_url(
@@ -45,7 +45,7 @@ class Integration(AbstractBaseModel):
             # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
             authorize_url_generator = AuthorizeUrlGenerator(
                 client_id = settings.SLACK_CLIENT_ID,
-                scopes = self.get_scopes(), # settings.SLACK_SCOPES,
+                scopes = self.scopes, # settings.SLACK_SCOPES,
                 # user_scopes=["search:read"],
                 redirect_uri=settings.AGENT_REDIRECT_URI
             )
@@ -56,7 +56,7 @@ class Integration(AbstractBaseModel):
         if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
             flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
                 settings.DEFAULT_CLIENT_SECRETS_FILE,
-                scopes = self.get_scopes(),
+                scopes = self.scopes,
                 state=state
             )
             redirect_uri = settings.AGENT_REDIRECT_URI
@@ -76,8 +76,51 @@ class Integration(AbstractBaseModel):
             )
             return oauth_response
     
-    def get_scopes(self):
-        scopes = [scope.strip() for scope in self.scopes.split(",")]
+    @property
+    def scopes(self):
+        if self.thirdparty == ThirdParty.GMAIL:
+            return settings.GOOGLE_GMAIL_SCOPES
+        elif self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+            return settings.GOOGLE_GMAIL_SCOPES
+        return []
+
+
+class Agent(AbstractBaseModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents", null=True)
+    name = models.CharField(max_length=255, default="AI assistant")
+    access_token = models.CharField(max_length=255)
+    refresh_token = models.CharField(max_length=255, null=True)
+    token_uri = models.CharField(max_length=255, null=True)
+    id_token = models.CharField(max_length=255)
+    integration = models.ForeignKey(Integration, on_delete=models.CASCADE, related_name="agents")
+    is_public = models.BooleanField(default=False)
+    scopes_text = models.TextField(null=True)
+    data = models.JSONField(null=True) # agent.json() or agent.dict()
+
+    def __str__(self):
+        return str(self.name)
+    
+    def invoke(self, input):
+        pass
+    
+    @property
+    def credentials(self):
+        if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+            credentials = google.oauth2.credentials.Credentials(
+                token=self.access_token,
+                refresh_token=self.refresh_token,
+                token_uri=self.token_uri,
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET,
+                scopes=self.scopes
+            )
+            return credentials
+        
+        return None
+    
+    @property
+    def scopes(self):
+        scopes = [scope.strip() for scope in self.scopes_text.split(",")]
         return scopes
 
 

@@ -20,7 +20,7 @@ class UserManager(BaseUserManager):
             **extra_fields
         )
         user.set_password(password)
-        user_group = Group.objects.get(name="user")
+        user_group, _ = Group.objects.get_or_create(name="user")
         user.save(using=self._db)
         user.groups.add(user_group)
         return user
@@ -31,7 +31,9 @@ class UserManager(BaseUserManager):
             password=password,
             **extra_fields
         )
+        admin_group, _ = Group.objects.get_or_create(name="admin")
         user.is_superuser = True
+        user.groups.add(admin_group)
         user.save(using=self._db)
         return user
 

@@ -1,5 +1,3 @@
-import html
-
 from django.http import HttpRequest
 from django.shortcuts import redirect, get_object_or_404
 
@@ -9,7 +7,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from agents.utils.google.utils import google_oauth, google_oauth_callback
 from common.models import State, ThirdParty
 from integrations.models import Integration
 
@@ -70,46 +67,65 @@ class OAuthCallBackAPIView(generics.GenericAPIView):
     serializer_class = AgentSerializer
 
     def get(self, request: HttpRequest, **kwargs):
-        try:
-            # Ensure that the request is not a forgery and that the user sending
-            # this connect request is the expected user.
-            gen_state = request.session.get("state")
-            thirdparty = request.session.get("thirdparty")
+        if request.GET.get("code", None):
+            try:
+                # Ensure that the request is not a forgery and that the user sending
+                # this connect request is the expected user.
+                gen_state = request.session.get("state")
+                thirdparty = request.session.get("thirdparty")
 
-            state = request.GET.get("state", "")
-            code = request.GET.get("code", "")
+                state = request.GET.get("state", "")
+                code = request.GET.get("code", "")
 
-            print(f"State: {state}\nCode: {code}\nThirdparty: {thirdparty}")
+                print(f"State: {state}\nCode: {code}\nThirdparty: {thirdparty}")
 
-            if not (state == gen_state):
-                return Response(
-                    "Invalid state parameter.", status=status.HTTP_401_UNAUTHORIZED
+                if not (state == gen_state):
+                    return Response(
+                        "Invalid state parameter.", status=status.HTTP_401_UNAUTHORIZED
+                    )
+
+                State.consume(state)
+
+                integration = Integration.objects.get(thirdparty=thirdparty)
+                credentials = integration.handle_oauth_callback(state, code)
+                print(credentials)
+
+                print(credentials_to_dict(credentials))
+                agent = Agent(
+                    user=request.user,
+                    access_token=credentials.token,
+                    refresh_token=credentials.refresh_token,
+                    token_uri=credentials.token_uri,
+                    integration=integration,
+                    scopes_text=", ".join(credentials.scopes),
                 )
+                agent.save()
 
-            State.consume(state)
-
-            integration = Integration.objects.get(thirdparty=thirdparty)
-            credentials = integration.handle_oauth_callback(state, code)
-
-            print(credentials_to_dict(credentials))
-            llm_agent = get_agent(thirdparty, credentials)
-            agent_json = llm_agent.json()
-            print(agent_json)
-            agent = Agent(
-                user=request.user,
-                access_token=credentials.token,
-                refresh_token=credentials.refresh_token,
-                token_uri=credentials.token_uri,
-                thirdparty=ThirdParty(thirdparty),
-                data=agent_json,
-            )
-            agent.save()
-
-            serializer = self.get_serializer(instance=agent)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except:
-            error = request.GET.get("error", "")
-            return Response(
-                f"Something is wrong with the installation (error: {html.escape(error)})",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+                serializer = self.get_serializer(instance=agent)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except:
+                error = request.GET.get("error", "")
+                return Response(
+                    f"Something is wrong with the installation (error: {str(error)})",
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            error = request.GET.get("error")
+            if error == "access_denied":
+                return Response(
+                    {"message": "Access denied!"}, status=status.HTTP_204_NO_CONTENT
+                )
+            elif error == "admin_policy_enforced":
+                return Response(
+                    {
+                        "message": "The Google Account is unable to authorize one or more scopes requested due to the policies of their Google Workspace administrator."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            else:
+                return Response(
+                    {
+                        "message": "Invalid request."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
