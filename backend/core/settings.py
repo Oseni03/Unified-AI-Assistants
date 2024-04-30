@@ -265,5 +265,5 @@ DEFAULT_CREDS_TOKEN_FILE = BASE_DIR / "token.json"
 DEFAULT_CLIENT_SECRETS_FILE = BASE_DIR / "credentials.json"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
-AGENT_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/agents/oauth/callback")
+INTEGRATION_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/integrations/oauth/callback")
 GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")

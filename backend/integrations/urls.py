@@ -6,7 +6,8 @@ from . import views
 app_name = "integrations"
 
 urlpatterns = [
-    path("oauth/<str:thirdparty>/install/<agent_id>/", views.OAUTHView.as_view(), name="install"),
-    path("oauth/callback/<str:thirdparty>/", views.OAUTHCallbackView.as_view(), name="oauth-callback"),
+    path("oauth/agents/<str:thirdparty>/connect/", views.OAUTHView.as_view(), name="install"),
+    path("oauth/bots/<str:thirdparty>/install/<agent_id>/", views.OAUTHView.as_view(), name="install"),
+    path("oauth/callback/", views.OAUTHCallbackView.as_view(), name="oauth-callback"),
     path("event/", views.EventView.as_view(), name="event"),
 ]

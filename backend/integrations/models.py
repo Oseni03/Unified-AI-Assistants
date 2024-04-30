@@ -33,7 +33,7 @@ class Integration(AbstractBaseModel):
                 settings.DEFAULT_CLIENT_SECRETS_FILE,
                 scopes = self.scopes,
             )
-            flow.redirect_uri = settings.AGENT_REDIRECT_URI
+            flow.redirect_uri = settings.INTEGRATION_REDIRECT_URI
             auth_url, _ = flow.authorization_url(
                 access_type="offline",
                 include_granted_scopes="true",
@@ -47,7 +47,7 @@ class Integration(AbstractBaseModel):
                 client_id = settings.SLACK_CLIENT_ID,
                 scopes = self.scopes, # settings.SLACK_SCOPES,
                 # user_scopes=["search:read"],
-                redirect_uri=settings.AGENT_REDIRECT_URI
+                redirect_uri=settings.INTEGRATION_REDIRECT_URI
             )
             auth_url = authorize_url_generator.generate(state)
         return auth_url
@@ -59,7 +59,7 @@ class Integration(AbstractBaseModel):
                 scopes = self.scopes,
                 state=state
             )
-            redirect_uri = settings.AGENT_REDIRECT_URI
+            redirect_uri = settings.INTEGRATION_REDIRECT_URI
             print(f"Redirect URI: {redirect_uri}")
             flow.redirect_uri = redirect_uri
             flow.fetch_token(code=code)
@@ -71,7 +71,7 @@ class Integration(AbstractBaseModel):
             oauth_response = client.oauth_v2_access(
                 client_id=settings.SLACK_CLIENT_ID,
                 client_secret=settings.SLACK_CLIENT_SECRET,
-                redirect_uri=settings.AGENT_REDIRECT_URI,
+                redirect_uri=settings.INTEGRATION_REDIRECT_URI,
                 code=code
             )
             return oauth_response

@@ -80,7 +80,7 @@ def google_oauth(thirdparty, gen_state, user_email):
             settings.DEFAULT_CLIENT_SECRETS_FILE,
             scopes = GOOGLE_CALENDER_SCOPES
         )
-    flow.redirect_uri = settings.AGENT_REDIRECT_URI
+    flow.redirect_uri = settings.INTEGRATION_REDIRECT_URI
     auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
@@ -104,7 +104,7 @@ def google_oauth_callback(thirdparty, state, code):
             scopes = GOOGLE_CALENDER_SCOPES,
             state=state
         )
-    redirect_uri = settings.AGENT_REDIRECT_URI
+    redirect_uri = settings.INTEGRATION_REDIRECT_URI
     print(f"Redirect URI: {redirect_uri}")
     flow.redirect_uri = redirect_uri
     flow.fetch_token(code=code)

@@ -14,6 +14,8 @@ from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
 
 from agents.models import Agent
+from agents.utils.google.utils import credentials_to_dict
+from agents.serializers import AgentSerializer
 from common.models import State, ThirdParty
 
 from .utils import fetch_response, save_bot, create_slack_installation_url
@@ -25,8 +27,9 @@ from .serializers import BotSerializer, EventSerializer
 class OAUTHView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, thirdparty, agent_id, **kwargs):
-        request.session["agent_id"] = agent_id
+    def get(self, request, thirdparty, agent_id=None, **kwargs):
+        if agent_id:
+            request.session["agent_id"] = agent_id
         # Generate a random value and store it on the server-side
         state = State().issue(thirdparty)
         request.session["thirdparty"] = thirdparty  # Add to the session
@@ -40,7 +43,6 @@ class OAUTHView(APIView):
 
 class OAUTHCallbackView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
-    serializer_class = BotSerializer
 
     def get(self, request, **kwargs):
         try:
@@ -51,7 +53,7 @@ class OAUTHCallbackView(generics.GenericAPIView):
 
             gen_state = request.session.get("state")
             thirdparty = request.session.get("thirdparty")
-            agent_id = request.session.get("agent_id")
+            agent_id = None
 
             print(
                 f"State: {state}\nCode: {code}\nThirdparty: {thirdparty}\nAgent-ID: {agent_id}"
@@ -65,23 +67,56 @@ class OAUTHCallbackView(generics.GenericAPIView):
             State.consume(state)
 
             integration = Integration.objects.get(thirdparty=thirdparty)
-            client = WebClient()
-            oauth_response = integration.handle_oauth_callback(
-                state, code, client=client
-            )
+            if integration.is_chat_app:
+                agent_id = request.session.get("agent_id")
+                client = WebClient()
+                oauth_response = integration.handle_oauth_callback(
+                    state, code, client=client
+                )
 
-            agent = get_object_or_404(Agent, id=agent_id)
-            bot = save_bot(agent, oauth_response, client)
+                agent = get_object_or_404(Agent, id=agent_id)
+                bot = save_bot(agent, oauth_response, client)
 
-            serializer = self.get_serializer(instance=bot)
+                serializer = BotSerializer(instance=bot)
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                credentials = integration.handle_oauth_callback(state, code)
+                print(credentials)
+
+                print(credentials_to_dict(credentials))
+                agent = Agent(
+                    user=request.user,
+                    access_token=credentials.token,
+                    refresh_token=credentials.refresh_token,
+                    token_uri=credentials.token_uri,
+                    integration=integration,
+                    scopes_text=", ".join(credentials.scopes),
+                )
+                agent.save()
+
+                serializer = AgentSerializer(instance=agent)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
         except:
             error = request.GET.get("error", "")
-            return Response(
-                f"Something is wrong with the installation (error: {html.escape(error)})",
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            if error == "access_denied":
+                return Response(
+                    {"message": "Access denied!"}, status=status.HTTP_204_NO_CONTENT
+                )
+            elif error == "admin_policy_enforced":
+                return Response(
+                    {
+                        "message": "The Google Account is unable to authorize one or more scopes requested due to the policies of their Google Workspace administrator."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            else:
+                return Response(
+                    {
+                        "message": "Invalid request."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
 
 signature_verifier = SignatureVerifier(signing_secret=settings.SLACK_SIGNING_SECRET)
