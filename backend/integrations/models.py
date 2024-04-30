@@ -25,7 +25,7 @@ class Integration(AbstractBaseModel):
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.thirdparty.title
+        return str(self.thirdparty.title)
     
     def get_oauth_url(self, state: str, user_email: str) -> str:
         if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
@@ -82,6 +82,8 @@ class Integration(AbstractBaseModel):
             return settings.GOOGLE_GMAIL_SCOPES
         elif self.thirdparty == ThirdParty.GOOGLE_CALENDER:
             return settings.GOOGLE_GMAIL_SCOPES
+        elif self.thirdparty == ThirdParty.SLACK:
+            return settings.SLACK_SCOPES
         return []
 
 
@@ -157,89 +159,8 @@ class Bot(AbstractBaseModel):
     incoming_webhook_configuration_url = models.CharField(max_length=255, null=True)
     is_enterprise_install = models.BooleanField(default=False)
     token_type = models.CharField(max_length=255, null=True)
-    installed_at = models.DateTimeField()
+    installed_at = models.DateTimeField(auto_now=True)
     custom_values = models.JSONField(null=True)
-
-    def __init__(
-        self,
-        *,
-        app_id,
-        # org / workspace
-        enterprise_id,
-        enterprise_name,
-        enterprise_url,
-        team_id,
-        team_name,
-        # bot
-        access_token,
-        bot_id,
-        bot_user_id,
-        bot_scopes,
-        bot_refresh_token,  # only when token rotation is enabled
-        access_token_expires_in,
-        # installer
-        user_id: str,
-        user_token,
-        user_scopes,
-        user_refresh_token,  # only when token rotation is enabled
-        # only when token rotation is enabled
-        user_token_expires_at,
-        # incoming webhook
-        incoming_webhook_url,
-        incoming_webhook_channel,
-        incoming_webhook_channel_id,
-        incoming_webhook_configuration_url,
-        # org app
-        is_enterprise_install,
-        token_type,
-        # timestamps
-        # The expected value type is float but the internals handle other types too
-        # for str values, we supports only ISO datetime format.
-        installed_at,
-        # custom values
-        custom_values,
-    ):
-        self.app_id = app_id
-        self.enterprise_id = enterprise_id
-        self.enterprise_name = enterprise_name
-        self.enterprise_url = enterprise_url
-        self.team_id = team_id
-        self.team_name = team_name
-        self.access_token = access_token
-        self.bot_id = bot_id
-        self.bot_user_id = bot_user_id
-        if isinstance(bot_scopes, list):
-            self.bot_scopes = " , ".join(bot_scopes)
-            # self.bot_scopes = bot_scopes.split(",") if len(bot_scopes) > 0 else []
-        else:
-            self.bot_scopes = bot_scopes
-        self.bot_refresh_token = bot_refresh_token
-        self.access_token_expires_in = access_token_expires_in
-
-        self.user_id = user_id
-        self.user_token = user_token
-        if isinstance(user_scopes, str):
-            self.user_scopes = user_scopes.split(",") if len(user_scopes) > 0 else []
-        else:
-            self.user_scopes = user_scopes
-        self.user_refresh_token = user_refresh_token
-
-        self.user_token_expires_at = user_token_expires_at
-
-        self.incoming_webhook_url = incoming_webhook_url
-        self.incoming_webhook_channel = incoming_webhook_channel
-        self.incoming_webhook_channel_id = incoming_webhook_channel_id
-        self.incoming_webhook_configuration_url = incoming_webhook_configuration_url
-
-        self.is_enterprise_install = is_enterprise_install or False
-        self.token_type = token_type
-
-        if installed_at is None:
-            self.installed_at = datetime.now().timestamp()
-        else:
-            self.installed_at = installed_at
-
-        self.custom_values = custom_values if custom_values is not None else {}
 
     def to_bot(self) -> SlackBot:
         return SlackBot(

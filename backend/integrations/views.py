@@ -3,7 +3,7 @@ import uuid
 
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse
+from django.http import HttpRequest
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -26,7 +26,7 @@ from .serializers import BotSerializer, EventSerializer
 class OAUTHView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, thirdparty, agent_id=None, **kwargs):
+    def get(self, request: HttpRequest, thirdparty: str, agent_id=None, **kwargs):
         if agent_id:
             request.session["agent_id"] = agent_id
         # Generate a random value and store it on the server-side
@@ -43,7 +43,7 @@ class OAUTHView(APIView):
 class OAUTHCallbackView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    def get(self, request, **kwargs):
+    def get(self, request: HttpRequest, **kwargs):
         try:
             # Ensure that the request is not a forgery and that the user sending
             # this connect request is the expected user.
@@ -52,7 +52,7 @@ class OAUTHCallbackView(APIView):
 
             gen_state = request.session.get("state")
             thirdparty = request.session.get("thirdparty")
-            agent_id = None
+            agent_id = request.session.get("agent_id", "")
 
             print(
                 f"State: {state}\nCode: {code}\nThirdparty: {thirdparty}\nAgent-ID: {agent_id}"
@@ -72,6 +72,8 @@ class OAUTHCallbackView(APIView):
                 oauth_response = integration.handle_oauth_callback(
                     state, code, client=client
                 )
+
+                print(oauth_response)
 
                 agent = get_object_or_404(Agent, id=agent_id)
                 bot = save_bot(agent, oauth_response, client)
@@ -96,7 +98,7 @@ class OAUTHCallbackView(APIView):
 
                 serializer = AgentSerializer(instance=agent)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except:
+        except Exception as error:
             error = request.GET.get("error", "")
             if error == "access_denied":
                 return Response(
@@ -112,7 +114,7 @@ class OAUTHCallbackView(APIView):
             else:
                 return Response(
                     {
-                        "message": "Invalid request."
+                        "message": f"Invalid request with error: {error}."
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -127,25 +129,22 @@ class EventView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = EventSerializer
 
-    def post(self, request, **kwargs):
-        print(request.data)
-
+    def post(self, request: HttpRequest, **kwargs):
         # Verify incoming requests from Slack
         # https://api.slack.com/authentication/verifying-requests-from-slack
         if not signature_verifier.is_valid(
-            body=request.get_data(),
+            body=request.body,
             timestamp=request.headers.get("X-Slack-Request-Timestamp"),
             signature=request.headers.get("X-Slack-Signature"),
         ):
             return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
 
-        print(request.form)
         print(request.data)
 
         # in the case where this app gets a request from an Enterprise Grid workspace
-        enterprise_id = request.form.get("enterprise_id")
+        enterprise_id = request.data.get("enterprise_id")
         # The workspace's ID
-        team_id = request.form["team_id"]
+        team_id = request.data["team_id"]
 
         # Lookup the stored bot token for this workspace
         bot = Bot.objects.filter(
@@ -159,14 +158,14 @@ class EventView(generics.GenericAPIView):
 
         client = WebClient(token=bot_token)
         bot_id = client.api_call("auth.test")["user_id"]
-        trigger_id = request.form["trigger_id"]
+        trigger_id = request.data["trigger_id"]
 
-        channel_id = request.form["channel"]
-        thread_ts = request.form["ts"]
-        user_id = request.form["user"]
-        query = request.form.get("text")
+        channel_id = request.data["channel"]
+        thread_ts = request.data["ts"]
+        user_id = request.data["user"]
+        query = request.data.get("text")
 
-        if user_id == bot_id:  # OR if request.form.get('subtype') == 'bot_message':
+        if user_id == bot_id:  # OR if request.data.get('subtype') == 'bot_message':
             return Response({}, status=status.HTTP_200_OK)
 
         # Post an initial message
@@ -175,13 +174,15 @@ class EventView(generics.GenericAPIView):
         )
         thread_ts = result["ts"]
 
-        # Fetch response using RemoteRunnable
-        response = fetch_response(query)
+        # # Fetch response using RemoteRunnable
+        # response = fetch_response(query)
 
-        # Process response and send follow-up message
-        output_text = response[
-            "output"
-        ]  # Adjust according to your actual response structure
+        # # Process response and send follow-up message
+        # output_text = response[
+        #     "output"
+        # ]  # Adjust according to your actual response structure
+
+        output_text = output_text
 
         # Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
         client.chat_update(

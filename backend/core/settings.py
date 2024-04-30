@@ -245,19 +245,13 @@ OTP_VALIDATE_PATH = "/auth/validate-otp"
 # SLACK CONFIGURATIONS
 SLACK_SCOPES = env("SLACK_SCOPES", default=[
     "chat:write",
-    "channels:read",
-    "groups:read",
-    "in:read",
-    "channels:manage",
-    "group:write",
-    "in:write",
-    "apin:write",
-    "channels:join",
+    "channels:history",
+    "app_mentions:read"
 ])
 SLACK_CLIENT_ID = env("SLACK_CLIENT_ID", default="")
 SLACK_CLIENT_SECRET = env("SLACK_CLIENT_SECRET", default="")
 SLACK_SIGNING_SECRET = env("SLACK_SIGNING_SECRET", default="")
-SLACK_EVENT_URL = env("SLACK_EVENT_URL", default="/slack/events")
+SLACK_EVENT_URL = urljoin(DOMAIN_URL, "/api/integrations/event")
 SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=3000)
 
 # GOOGLE CONFIGURATIONS
