@@ -141,6 +141,12 @@ class EventView(generics.GenericAPIView):
 
         print(request.data)
 
+        type = request.data.get("type")
+
+        if type == "url_verification":
+            challenge = request.data.get("challenge")
+            return Response({"challenge": challenge}, status=status.HTTP_200_OK)
+
         # in the case where this app gets a request from an Enterprise Grid workspace
         enterprise_id = request.data.get("enterprise_id")
         # The workspace's ID
@@ -174,15 +180,14 @@ class EventView(generics.GenericAPIView):
         )
         thread_ts = result["ts"]
 
-        # # Fetch response using RemoteRunnable
-        # response = fetch_response(query)
+        # Fetch response using RemoteRunnable
+        response = fetch_response(query)
 
-        # # Process response and send follow-up message
-        # output_text = response[
-        #     "output"
-        # ]  # Adjust according to your actual response structure
+        # Process response and send follow-up message
+        output_text = response[
+            "output"
+        ]  # Adjust according to your actual response structure
 
-        output_text = output_text
 
         # Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
         client.chat_update(
