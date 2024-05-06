@@ -1,13 +1,4 @@
-from datetime import datetime
-from django.shortcuts import get_object_or_404
-from django.conf import settings
-from django.urls import reverse
-
 from slack_sdk import WebClient
-from slack_sdk.oauth import AuthorizeUrlGenerator
-
-from accounts.models import User
-from common.models import ThirdParty
 
 from .models import Bot, Agent
 
@@ -28,42 +19,25 @@ def save_bot(agent: Agent, oauth_response: dict, client: WebClient):
         if is_enterprise_install is True:
             enterprise_url = auth_test.get("url")
 
-    bot = Bot.objects.create(
+    bot, _ = Bot.objects.get_or_create(
         agent=agent,
+        user_id=installer.get("id"),
         app_id=oauth_response.get("app_id"),
-        enterprise_id=installed_enterprise.get("id"),
-        enterprise_name=installed_enterprise.get("name"),
-        enterprise_url=enterprise_url,
         team_id=installed_team.get("id"),
-        team_name=installed_team.get("name"),
-        access_token=access_token,
         bot_id=bot_id,
         bot_user_id=oauth_response.get("bot_user_id"),
-        bot_scopes=oauth_response.get("scope"),  # comma-separated string
-        user_id=installer.get("id"),
-        user_token=installer.get("access_token"),
-        user_scopes=installer.get("scope"),  # comma-separated string
-        is_enterprise_install=is_enterprise_install,
-        token_type=oauth_response.get("token_type"),
-    )
+        defaults={
+            "enterprise_id": installed_enterprise.get("id"),
+            "enterprise_name": installed_enterprise.get("name"),
+            "enterprise_url": enterprise_url,
+            "team_name": installed_team.get("name"),
+            "access_token": access_token,
+            "bot_scopes": oauth_response.get("scope"),  # comma-separated string
+            "user_token": installer.get("access_token"),
+            "user_scopes": installer.get("scope"),  # comma-separated string
+            "is_enterprise_install": is_enterprise_install,
+            "token_type": oauth_response.get("token_type"),
 
-    # Store the bot
+        }
+    )
     return bot
-
-
-def fetch_response(query: str, bot_id, user: User):
-    bot = get_object_or_404(Bot, bot_id=bot_id, user=user)
-    response = bot.agent.invoke(query)
-    return response
-
-
-def create_slack_installation_url(state):
-    # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
-    authorize_url_generator = AuthorizeUrlGenerator(
-        client_id=settings.SLACK_CLIENT_ID,
-        scopes=settings.SLACK_SCOPES,
-        # user_scopes=["search:read"],
-        redirect_uri=settings.DOMAIN_URL + reverse("integrations:oauth-callback", args=(ThirdParty.SLACK,))
-    )
-    url = authorize_url_generator.generate(state)
-    return url

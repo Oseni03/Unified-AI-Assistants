@@ -1,14 +1,12 @@
+from django.urls import reverse
 import google_auth_oauthlib
+import google.oauth2.credentials
 
-from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
-from uuid import uuid4
 
 from django.conf import settings
 from django.db import models
 
-from langchain.agents.agent import AgentExecutor
-import google.oauth2.credentials
 from slack_sdk.oauth.installation_store.models.bot import Bot as SlackBot
 from slack_sdk.oauth import AuthorizeUrlGenerator
 from slack_sdk import WebClient
@@ -21,17 +19,31 @@ class Integration(AbstractBaseModel):
     thirdparty = models.CharField(
         max_length=50, unique=True, choices=ThirdParty.choices
     )
-    is_chat_app = models.BooleanField(help_text="Is it a messaging app integration or other thirdparty integration")
+    is_chat_app = models.BooleanField(
+        help_text="Is it a messaging app integration or other thirdparty integration"
+    )
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return str(self.thirdparty.title)
     
+    def get_absolute_url(self):
+        if not self.is_chat_app:
+            return reverse("agent-install", kwargs={"thirdparty": self.thirdparty})
+    
+
     def get_oauth_url(self, state: str, user_email: str) -> str:
-        if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+        if (
+            self.thirdparty == ThirdParty.GMAIL
+            or self.thirdparty == ThirdParty.GOOGLE_CALENDER
+            or self.thirdparty == ThirdParty.GOOGLE_DOCUMENT
+            or self.thirdparty == ThirdParty.GOOGLE_DRIVE
+            or self.thirdparty == ThirdParty.GOOGLE_SHEET
+            or self.thirdparty == ThirdParty.GOOGLE_FORM
+        ):
             flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
                 settings.DEFAULT_CLIENT_SECRETS_FILE,
-                scopes = self.scopes,
+                scopes=self.scopes,
             )
             flow.redirect_uri = settings.INTEGRATION_REDIRECT_URI
             auth_url, _ = flow.authorization_url(
@@ -39,25 +51,30 @@ class Integration(AbstractBaseModel):
                 include_granted_scopes="true",
                 state=state,
                 login_hint=user_email,
-                prompt="consent"
+                prompt="consent",
             )
         elif self.thirdparty == ThirdParty.SLACK:
             # Build https://slack.com/oauth/v2/authorize with sufficient query parameters
             authorize_url_generator = AuthorizeUrlGenerator(
-                client_id = settings.SLACK_CLIENT_ID,
-                scopes = self.scopes, # settings.SLACK_SCOPES,
+                client_id=settings.SLACK_CLIENT_ID,
+                scopes=self.scopes,  # settings.SLACK_SCOPES,
                 # user_scopes=["search:read"],
-                redirect_uri=settings.INTEGRATION_REDIRECT_URI
+                redirect_uri=settings.INTEGRATION_REDIRECT_URI,
             )
             auth_url = authorize_url_generator.generate(state)
         return auth_url
-    
+
     def handle_oauth_callback(self, state: str, code: str, client: WebClient = None):
-        if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+        if (
+            self.thirdparty == ThirdParty.GMAIL
+            or self.thirdparty == ThirdParty.GOOGLE_CALENDER
+            or self.thirdparty == ThirdParty.GOOGLE_DOCUMENT
+            or self.thirdparty == ThirdParty.GOOGLE_DRIVE
+            or self.thirdparty == ThirdParty.GOOGLE_SHEET
+            or self.thirdparty == ThirdParty.GOOGLE_FORM
+        ):
             flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-                settings.DEFAULT_CLIENT_SECRETS_FILE,
-                scopes = self.scopes,
-                state=state
+                settings.DEFAULT_CLIENT_SECRETS_FILE, scopes=self.scopes, state=state
             )
             redirect_uri = settings.INTEGRATION_REDIRECT_URI
             print(f"Redirect URI: {redirect_uri}")
@@ -72,54 +89,69 @@ class Integration(AbstractBaseModel):
                 client_id=settings.SLACK_CLIENT_ID,
                 client_secret=settings.SLACK_CLIENT_SECRET,
                 redirect_uri=settings.INTEGRATION_REDIRECT_URI,
-                code=code
+                code=code,
             )
             return oauth_response
-    
+
     @property
     def scopes(self):
         if self.thirdparty == ThirdParty.GMAIL:
             return settings.GOOGLE_GMAIL_SCOPES
         elif self.thirdparty == ThirdParty.GOOGLE_CALENDER:
-            return settings.GOOGLE_GMAIL_SCOPES
+            return settings.GOOGLE_CALENDER_SCOPES
+        elif self.thirdparty == ThirdParty.GOOGLE_DOCUMENT:
+            return settings.GOOGLE_DOCUMENT_SCOPES
+        elif self.thirdparty == ThirdParty.GOOGLE_DRIVE:
+            return settings.GOOGLE_DRIVE_SCOPES
+        elif self.thirdparty == ThirdParty.GOOGLE_SHEET:
+            return settings.GOOGLE_SHEET_SCOPES
+        elif self.thirdparty == ThirdParty.GOOGLE_FORM:
+            return settings.GOOGLE_FORM_SCOPES
         elif self.thirdparty == ThirdParty.SLACK:
             return settings.SLACK_SCOPES
         return []
 
 
 class Agent(AbstractBaseModel):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="agents", null=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="agents",
+        null=True,
+    )
     name = models.CharField(max_length=255, default="AI assistant")
     access_token = models.CharField(max_length=255)
     refresh_token = models.CharField(max_length=255, null=True)
     token_uri = models.CharField(max_length=255, null=True)
     id_token = models.CharField(max_length=255)
-    integration = models.ForeignKey(Integration, on_delete=models.CASCADE, related_name="agents")
+    integration = models.ForeignKey(
+        Integration, on_delete=models.CASCADE, related_name="agents"
+    )
     is_public = models.BooleanField(default=False)
     scopes_text = models.TextField(null=True)
-    data = models.JSONField(null=True) # agent.json() or agent.dict()
+    data = models.JSONField(null=True)  # agent.json() or agent.dict()
 
     def __str__(self):
         return str(self.name)
-    
-    def invoke(self, input):
-        pass
-    
+
     @property
     def credentials(self):
-        if self.thirdparty == ThirdParty.GMAIL or self.thirdparty == ThirdParty.GOOGLE_CALENDER:
+        if (
+            self.integration.thirdparty == ThirdParty.GMAIL
+            or self.integration.thirdparty == ThirdParty.GOOGLE_CALENDER
+        ):
             credentials = google.oauth2.credentials.Credentials(
                 token=self.access_token,
                 refresh_token=self.refresh_token,
                 token_uri=self.token_uri,
                 client_id=settings.GOOGLE_CLIENT_ID,
                 client_secret=settings.GOOGLE_CLIENT_SECRET,
-                scopes=self.scopes
+                scopes=self.scopes,
             )
             return credentials
-        
+
         return None
-    
+
     @property
     def scopes(self):
         scopes = [scope.strip() for scope in self.scopes_text.split(",")]
@@ -161,6 +193,11 @@ class Bot(AbstractBaseModel):
     token_type = models.CharField(max_length=255, null=True)
     installed_at = models.DateTimeField(auto_now=True)
     custom_values = models.JSONField(null=True)
+
+    class Meta:
+        models.UniqueConstraint(
+            fields=["app_id", "user_id", "team_id"], name="unique_user_team_app"
+        )
 
     def to_bot(self) -> SlackBot:
         return SlackBot(

@@ -32,6 +32,7 @@ class ThirdParty(models.TextChoices):
     GOOGLE_DOCUMENT = "google-document", _("Google Document")
     GOOGLE_DRIVE = "google-drive", _("Google Drive")
     GOOGLE_SHEET = "google-sheet", _("Google Sheet")
+    GOOGLE_FORM = "google-form", _("Google Form")
     SALESFORCE = "salesforce", _("Salesforce")
     SLACK = "slack", _("Slack")
 

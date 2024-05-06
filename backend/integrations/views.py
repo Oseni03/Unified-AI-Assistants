@@ -1,6 +1,3 @@
-import html
-import uuid
-
 from django.conf import settings
 from django.shortcuts import get_object_or_404, redirect
 from django.http import HttpRequest
@@ -13,11 +10,11 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
 
-from agents.utils.google.utils import credentials_to_dict
+from agents.utils.utils import credentials_to_dict, get_agent
 from agents.serializers import AgentSerializer
 from common.models import State
 
-from .utils import fetch_response, save_bot, create_slack_installation_url
+from .utils import save_bot
 from .models import Bot, Integration, Agent
 from .serializers import BotSerializer, EventSerializer
 
@@ -31,6 +28,8 @@ class OAUTHView(APIView):
             request.session["agent_id"] = agent_id
         # Generate a random value and store it on the server-side
         state = State().issue(thirdparty)
+        print(state)
+        print(thirdparty)
         request.session["thirdparty"] = thirdparty  # Add to the session
         request.session["state"] = state  # Add to the session
 
@@ -113,9 +112,7 @@ class OAUTHCallbackView(APIView):
                 )
             else:
                 return Response(
-                    {
-                        "message": f"Invalid request with error: {error}."
-                    },
+                    {"message": f"Invalid request with error: {error}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -139,72 +136,76 @@ class EventView(generics.GenericAPIView):
         ):
             return Response("invalid request", status=status.HTTP_400_BAD_REQUEST)
 
-        print(request.data)
+        data = request.data
 
-        type = request.data.get("type")
-
-        if type == "url_verification":
-            challenge = request.data.get("challenge")
+        if data.get("type") == "url_verification":
+            challenge = data.get("challenge")
             return Response({"challenge": challenge}, status=status.HTTP_200_OK)
 
-        # in the case where this app gets a request from an Enterprise Grid workspace
-        enterprise_id = request.data.get("enterprise_id")
-        # The workspace's ID
-        team_id = request.data["team_id"]
+        if "event" in data:
+            event = data.get("event")
 
-        # Lookup the stored bot token for this workspace
-        bot = Bot.objects.filter(
-            enterprise_id=enterprise_id,
-            team_id=team_id,
-        )
-        bot_token = bot.first().bot_token if bot.exists() else None
-        if not bot_token:
-            # The app may be uninstalled or be used in a shared channel
-            return Response("Please install this app first!", status=status.HTTP_200_OK)
+            # in the case where this app gets a request from an Enterprise Grid workspace
+            enterprise_id = data.get("enterprise_id")
+            print(f"Enterprise ID: {enterprise_id}")
+            # The workspace's ID
+            team_id = data.get("team_id")
+            user_id = event.get("user")
+            query = event.get("text")
+            channel = event.get("channel")
+            thread_ts = event.get("ts")
 
-        client = WebClient(token=bot_token)
-        bot_id = client.api_call("auth.test")["user_id"]
-        trigger_id = request.data["trigger_id"]
+            # Lookup the stored bot token for this workspace
+            try:
+                bot = Bot.objects.get(
+                    user_id=user_id,
+                    team_id=team_id,
+                )
+            except:
+                return Response(status=status.HTTP_200_OK)
 
-        channel_id = request.data["channel"]
-        thread_ts = request.data["ts"]
-        user_id = request.data["user"]
-        query = request.data.get("text")
+            agent = bot.agent
+            bot_token = bot.access_token
+            print(f"Bot Token: {bot_token}")
+            if not bot_token:
+                # The app may be uninstalled or be used in a shared channel
+                return Response(
+                    "Please install this app first!", status=status.HTTP_200_OK
+                )
 
-        if user_id == bot_id:  # OR if request.data.get('subtype') == 'bot_message':
-            return Response({}, status=status.HTTP_200_OK)
+            client = WebClient(token=bot_token)
+            bot_id = client.api_call("auth.test")["user_id"]
 
-        # Post an initial message
-        result = client.chat_postpayload(
-            channel=channel_id, text=":mag: Searching...", thread_ts=thread_ts
-        )
-        thread_ts = result["ts"]
+            # Ignore bot's own message
+            if user_id == bot_id:
+                return Response(status=status.HTTP_200_OK)
 
-        # Fetch response using RemoteRunnable
-        response = fetch_response(query)
+            # Post an initial message
+            result = client.chat_postMessage(
+                channel=channel, text=":mag: Searching...", thread_ts=thread_ts
+            )
+            thread_ts = result.get("ts")
 
-        # Process response and send follow-up message
-        output_text = response[
-            "output"
-        ]  # Adjust according to your actual response structure
+            # Fetch response using RemoteRunnable
+            agent_executor = get_agent(agent.integration, agent.credentials)
+            response = agent_executor.invoke({"input": query})
 
+            # Process response and send follow-up message
+            output_text = response[
+                "output"
+            ]  # Adjust according to your actual response structure
 
-        # Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
-        client.chat_update(
-            channel=channel_id,
-            ts=thread_ts,
-            text=output_text,
-            blocks=[
-                {"type": "section", "text": {"type": "mrkdwn", "text": output_text}}
-            ],
-        )
+            # Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
+            # client.chat_update(
+            client.chat_postMessage(
+                channel=channel,
+                ts=thread_ts,
+                text=output_text,
+                blocks=[
+                    {"type": "section", "text": {"type": "mrkdwn", "text": output_text}}
+                ],
+            )
+            serializer = self.get_serializer({"query": query, "response": output_text})
 
-        resp_data = {
-            "query": query,
-            "response": {
-                "mrkdwn": output_text,
-            },
-        }
-        serializer = self.get_serializer({"query": query, "response": output_text})
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"message": "No event"}, status=status.HTTP_200_OK)
