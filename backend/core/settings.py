@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
+    "django_celery_results",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [
@@ -278,3 +280,14 @@ GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
 INTEGRATION_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/integrations/oauth/callback")
 GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")  # For GeminiAPI 
+
+
+# CELERY CONFIGURATIONS
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_CACHE_BACKEND = 'django-cache'
+CELERY_BROKER_URL=env('CELERY_BROKER_URL', default='redis://127.0.0.1:6379/0')
+# this allows you to schedule items in the Django admin.
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_REDIS_BACKEND_USE_SSL = True
+CELERY_BROKER_USE_SSL =True

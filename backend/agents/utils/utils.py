@@ -47,37 +47,38 @@ GeminiLLM = ChatGoogleGenerativeAI(
 
 
 def create_prompt(thirdparty="slack"):
+    if thirdparty == ThirdParty.SLACK:
 
-    template = '''You are a helpful assistant searches domain knowledge. Use tools (only if necessary) to best answer the users' questions. 
-        Return the response in {thirdparty} mrkdwn format, including emojis, bullet points, and bold text where necessary. 
-        
-        {thirdparty} message formatting example:
-        Bold text: *bold text*
-        Italic text: _italic text_
-        Bullet points: • example 1 \n • example 2 \n
-        Link: <fakeLink.toEmployeeProfile.com|Fred Enriquez - New device request>
-        Remember that {thirdpary} mrkdwn formatting is different from regular markdown formatting. do not use regular markdown formatting in your response.
-        As an example do not us the following: **bold text** or [link](http://example.com),
-        
-        You have access to the following tools:
+        template = '''You are a helpful assistant searches domain knowledge. Use tools (only if necessary) to best answer the users' questions. 
+            Return the response in slack mrkdwn format, including emojis, bullet points, and bold text where necessary. 
+            
+            Slack message formatting example:
+            Bold text: *bold text*
+            Italic text: _italic text_
+            Bullet points: • example 1 \n • example 2 \n
+            Link: <fakeLink.toEmployeeProfile.com|Fred Enriquez - New device request>
+            Remember that Slack mrkdwn formatting is different from regular markdown formatting. do not use regular markdown formatting in your response.
+            As an example do not us the following: **bold text** or [link](http://example.com),
+            
+            You have access to the following tools:
 
-        {tools}
+            {tools}
 
-        Use the following format:
+            Use the following format:
 
-        Question: the input question you must answer
-        Thought: you should always think about what to do
-        Action: the action to take, should be one of [{tool_names}]
-        Action Input: the input to the action
-        Observation: the result of the action
-        ... (this Thought/Action/Action Input/Observation can repeat N times)
-        Thought: I now know the final answer
-        Final Answer: the final answer to the original input question
+            Question: the input question you must answer
+            Thought: you should always think about what to do
+            Action: the action to take, should be one of [{tool_names}]
+            Action Input: the input to the action
+            Observation: the result of the action
+            ... (this Thought/Action/Action Input/Observation can repeat N times)
+            Thought: I now know the final answer
+            Final Answer: the final answer to the original input question
 
-        Begin!
+            Begin!
 
-        Question: {input}
-        Thought:{agent_scratchpad}'''
+            Question: {input}
+            Thought:{agent_scratchpad}'''
 
     prompt = PromptTemplate.from_template(template, partial_variables={"thirdparty": thirdparty})
 
@@ -97,10 +98,9 @@ def get_agent(integration: Integration, credential: Credentials):
     tools = []
 
     if integration.thirdparty == ThirdParty.GMAIL:
-
         toolkit = GmailToolkit(credentials=credential)
     elif integration.thirdparty == ThirdParty.GOOGLE_CALENDER:
-        toolkit = GoogleCalenderToolkit(creds=credential)
+        toolkit = GoogleCalenderToolkit(credentials=credential)
     tools = toolkit.get_tools()
 
     prompt = create_prompt()
@@ -108,7 +108,7 @@ def get_agent(integration: Integration, credential: Credentials):
 
     agent = create_react_agent(GeminiLLM, tools, prompt)
 
-    agent_exceutor = AgentExecutor(agent=agent, tools=tools)
+    agent_exceutor = AgentExecutor(agent=agent, tools=tools, verbose=True)
     print(f"Created agent successfully")
     return agent_exceutor
     

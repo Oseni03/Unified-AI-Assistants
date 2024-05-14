@@ -15,6 +15,7 @@ from agents.serializers import AgentSerializer
 from common.models import State
 
 from .utils import save_bot
+from .tasks import agent_response
 from .models import Bot, Integration, Agent
 from .serializers import BotSerializer, EventSerializer
 
@@ -138,16 +139,26 @@ class EventView(generics.GenericAPIView):
 
         data = request.data
 
-        if data.get("type") == "url_verification":
+        data_type = data.get("type")
+        allowed_data_types = [
+            "url_verification",
+            "event_callback"
+        ]
+
+        if data_type not in allowed_data_types:
+            return Response("Not Allowed", status=status.HTTP_400_BAD_REQUEST)
+
+        if data_type == "url_verification":
             challenge = data.get("challenge")
             return Response({"challenge": challenge}, status=status.HTTP_200_OK)
 
-        if "event" in data:
-            event = data.get("event")
+        elif data_type == "event_callback":
+            event = data.get("event") or {}
+
+            # print(event)
 
             # in the case where this app gets a request from an Enterprise Grid workspace
-            enterprise_id = data.get("enterprise_id")
-            print(f"Enterprise ID: {enterprise_id}")
+            # enterprise_id = data.get("enterprise_id")
             # The workspace's ID
             team_id = data.get("team_id")
             user_id = event.get("user")
@@ -166,7 +177,6 @@ class EventView(generics.GenericAPIView):
 
             agent = bot.agent
             bot_token = bot.access_token
-            print(f"Bot Token: {bot_token}")
             if not bot_token:
                 # The app may be uninstalled or be used in a shared channel
                 return Response(
@@ -176,36 +186,41 @@ class EventView(generics.GenericAPIView):
             client = WebClient(token=bot_token)
             bot_id = client.api_call("auth.test")["user_id"]
 
+            if event.get("type") == "app_mention":
+                blocks = event.get("blocks") or []
+                elements = blocks[0].get("elements") or []
+                user_id = elements[0].get("user_id")
+                query = elements[1].get("text")
+            else:
+                user_id = event.get("user")
+                query = event.get("text")
+
             # Ignore bot's own message
             if user_id == bot_id:
                 return Response(status=status.HTTP_200_OK)
 
             # Post an initial message
-            result = client.chat_postMessage(
-                channel=channel, text=":mag: Searching...", thread_ts=thread_ts
-            )
-            thread_ts = result.get("ts")
+            # result = client.chat_postMessage(
+            #     channel=channel, text=":mag: Searching...", thread_ts=thread_ts
+            # )
+            # thread_ts = result.get("ts")
 
-            # Fetch response using RemoteRunnable
-            agent_executor = get_agent(agent.integration, agent.credentials)
-            response = agent_executor.invoke({"input": query})
+            print("About to run task")
+            print(f"""agent_id: {agent.id}
+                    channel: {channel}
+                    bot_token: {bot_token}
+                    query: {query}
+                    thread_ts: {thread_ts}""")
+            # send_agent_response.delay(agent.id, channel, thread_ts, bot_token, query)
+            agent_response.apply_async(kwargs={
+                "agent_id": agent.id,
+                "channel": channel,
+                "thread_ts": thread_ts,
+                "bot_token": bot_token,
+                "query": query,
+                "user_id": user_id,
+            })
+            # serializer = self.get_serializer({"query": query, "response": output_text})
 
-            # Process response and send follow-up message
-            output_text = response[
-                "output"
-            ]  # Adjust according to your actual response structure
-
-            # Update the initial message with the response and use mrkdown block section to return the response in Slack markdown format
-            # client.chat_update(
-            client.chat_postMessage(
-                channel=channel,
-                ts=thread_ts,
-                text=output_text,
-                blocks=[
-                    {"type": "section", "text": {"type": "mrkdwn", "text": output_text}}
-                ],
-            )
-            serializer = self.get_serializer({"query": query, "response": output_text})
-
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_200_OK)
         return Response({"message": "No event"}, status=status.HTTP_200_OK)
