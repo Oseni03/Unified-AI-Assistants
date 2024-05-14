@@ -6,10 +6,11 @@ from .models import Bot, Integration
 
 class IntegrationSerializer(serializers.ModelSerializer):
     id = rest.HashidSerializerCharField(read_only=True)
+    url = serializers.CharField(source="get_absolute_url", read_only=True)
 
     class Meta:
         model = Integration
-        fields = ("id", "thirdparty", "is_chat_app", "created_at")
+        fields = ("id", "thirdparty", "is_chat_app", "url")
 
 
 class BotSerializer(serializers.ModelSerializer):

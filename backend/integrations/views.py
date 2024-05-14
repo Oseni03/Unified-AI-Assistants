@@ -17,10 +17,17 @@ from common.models import State
 from .utils import save_bot
 from .tasks import agent_response
 from .models import Bot, Integration, Agent
-from .serializers import BotSerializer, EventSerializer
+from .serializers import BotSerializer, IntegrationSerializer
 
 
 # Create your views here.
+class IntegrationListView(generics.ListAPIView):
+    queryset = Integration.objects.filter(is_active=True)
+    serializer_class = IntegrationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ['is_chat_app']
+
+
 class OAUTHView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -121,11 +128,10 @@ class OAUTHCallbackView(APIView):
 signature_verifier = SignatureVerifier(signing_secret=settings.SLACK_SIGNING_SECRET)
 
 
-class EventView(generics.GenericAPIView):
+class EventView(APIView):
     """Token Lookup"""
 
     permission_classes = [permissions.AllowAny]
-    serializer_class = EventSerializer
 
     def post(self, request: HttpRequest, **kwargs):
         # Verify incoming requests from Slack
@@ -220,7 +226,6 @@ class EventView(generics.GenericAPIView):
                 "query": query,
                 "user_id": user_id,
             })
-            # serializer = self.get_serializer({"query": query, "response": output_text})
 
             return Response(status=status.HTTP_200_OK)
         return Response({"message": "No event"}, status=status.HTTP_200_OK)

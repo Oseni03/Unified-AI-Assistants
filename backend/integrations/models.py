@@ -29,9 +29,8 @@ class Integration(AbstractBaseModel):
     
     def get_absolute_url(self):
         if not self.is_chat_app:
-            return reverse("agent-install", kwargs={"thirdparty": self.thirdparty})
+            return reverse("integrations:agent-install", kwargs={"thirdparty": self.thirdparty})
     
-
     def get_oauth_url(self, state: str, user_email: str) -> str:
         if (
             self.thirdparty == ThirdParty.GMAIL
