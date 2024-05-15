@@ -2,8 +2,6 @@ from celery import shared_task
 from celery.utils.log import get_task_logger
 from slack_sdk import WebClient
 
-from django.contrib.sessions.backends.db import SessionStore
-
 from agents.utils.utils import get_agent
 from common.models import ThirdParty
 from integrations.models import Agent
@@ -19,14 +17,6 @@ def add(a, b):
 @shared_task
 def agent_response(agent_id, channel, thread_ts, bot_token, query, user_id=None):
     try:
-        # session = SessionStore()
-        # if "agent_executor" not in session:
-        #     agent = Agent.objects.get(id=agent_id)
-        #     print("Creating agent")
-        #     agent_executor = get_agent(agent.integration, agent.credentials)
-        #     session["agent_executor"] = agent_executor
-        # else:
-        #     agent_executor = session.get("agent_executor")
         logger.info("Creating agent")
         agent = Agent.objects.get(id=agent_id)
         agent_executor = get_agent(agent.integration, agent.credentials)

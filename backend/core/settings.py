@@ -289,5 +289,4 @@ CELERY_BROKER_URL=env('CELERY_BROKER_URL', default='redis://127.0.0.1:6379/0')
 # this allows you to schedule items in the Django admin.
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_REDIS_BACKEND_USE_SSL = True
 CELERY_BROKER_USE_SSL =True
