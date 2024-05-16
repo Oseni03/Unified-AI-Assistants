@@ -218,14 +218,14 @@ class EventView(APIView):
                     query: {query}
                     thread_ts: {thread_ts}""")
             # send_agent_response.delay(agent.id, channel, thread_ts, bot_token, query)
-            agent_response.apply_async(kwargs={
-                "agent_id": agent.id,
-                "channel": channel,
-                "thread_ts": thread_ts,
-                "bot_token": bot_token,
-                "query": query,
-                "user_id": user_id,
-            })
+            agent_response.send(
+                agent_id=agent.id,
+                channel=channel,
+                thread_ts=thread_ts,
+                bot_token=bot_token,
+                query=query,
+                user_id=user_id,
+            )
 
             return Response(status=status.HTTP_200_OK)
         return Response({"message": "No event"}, status=status.HTTP_200_OK)

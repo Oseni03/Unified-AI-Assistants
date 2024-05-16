@@ -4,6 +4,8 @@ import datetime
 from pathlib import Path
 from urllib.parse import urljoin
 
+import redis
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 # Take environment variables from .env file
@@ -39,21 +41,19 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # INTERNAL APPS
-    "common",
-    "accounts",
-    "agents",
-    "integrations",
-    "feedbacks",
     # THIRD-PARTY AUTH APPS
     "social_django",
     "drf_yasg",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
-    "django_filters",
-    "django_celery_results",
-    "django_celery_beat",
+    "django_dramatiq",
+    # INTERNAL APPS
+    "common",
+    "accounts",
+    "agents",
+    "integrations",
+    "feedbacks",
 ]
 
 MIDDLEWARE = [
@@ -282,11 +282,32 @@ INTEGRATION_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/integrations/oauth/callback
 GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")  # For GeminiAPI 
 
 
-# CELERY CONFIGURATIONS
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_CACHE_BACKEND = 'django-cache'
-CELERY_BROKER_URL=env('CELERY_BROKER_URL', default='redis://127.0.0.1:6379/0')
-# this allows you to schedule items in the Django admin.
-CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_BROKER_USE_SSL =True
+# DRAMATIQ CONFIGURATIONS
+DRAMATIQ_BROKER = {
+    "BROKER": "dramatiq.brokers.redis.RedisBroker",
+    "OPTIONS": {
+        "connection_pool": redis.ConnectionPool.from_url(env("REDIS_URL", default="redis://127.0.0.1:6379")),
+    },
+    "MIDDLEWARE": [
+        # "dramatiq.middleware.Prometheus",
+        "dramatiq.middleware.AgeLimit",
+        "dramatiq.middleware.TimeLimit",
+        "dramatiq.middleware.Callbacks",
+        "dramatiq.middleware.Retries",
+        "django_dramatiq.middleware.DbConnectionsMiddleware",
+        "django_dramatiq.middleware.AdminMiddleware",
+    ]
+}
+
+# Defines which database should be used to persist Task objects when the
+# AdminMiddleware is enabled.  The default value is "default".
+DRAMATIQ_TASKS_DATABASE = "default"
+# DRAMATIQ_RESULT_BACKEND = {
+#     "BACKEND": "dramatiq.results.backends.redis.RedisBackend",
+#     "BACKEND_OPTIONS": {
+#         "url": env("RABBITMQ_URL", default="amqp://localhost:5672"),
+#     },
+#     "MIDDLEWARE_OPTIONS": {
+#         "result_ttl": 1000 * 60 * 10
+#     }
+# }
