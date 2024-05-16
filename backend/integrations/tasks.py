@@ -1,29 +1,27 @@
-from celery import shared_task
-from celery.utils.log import get_task_logger
+import dramatiq
 from slack_sdk import WebClient
 
 from agents.utils.utils import get_agent
 from common.models import ThirdParty
 from integrations.models import Agent
 
-logger = get_task_logger(__name__)
 
 
-@shared_task
+@dramatiq.actor
 def add(a, b):
     return a + b
 
 
-@shared_task
+@dramatiq.actor
 def agent_response(agent_id, channel, thread_ts, bot_token, query, user_id=None):
     try:
-        logger.info("Creating agent")
+        print("Creating agent")
         agent = Agent.objects.get(id=agent_id)
         agent_executor = get_agent(agent.integration, agent.credentials)
         
         response = agent_executor.invoke({"input": query})
 
-        logger.info(response)
+        print(response)
 
         output_text = response[
             "output"
@@ -44,7 +42,7 @@ def agent_response(agent_id, channel, thread_ts, bot_token, query, user_id=None)
                     {"type": "section", "text": {"type": "mrkdwn", "text": output_text}}
                 ],
             )
-        logger.info("Message send successfully")
+        print("Message send successfully")
         return response
     except Exception as e:
         raise e
