@@ -18,7 +18,7 @@ class BotSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Bot 
-        fields = "__all__"
+        fields = ("id", "team_id", "team_name", "is_enterprise_install", "enterprise_id", "enterprise_name", "created_at", "updated_at")
 
 
 class EventSerializer(serializers.Serializer):

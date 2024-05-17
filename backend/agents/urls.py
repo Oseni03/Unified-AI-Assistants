@@ -1,11 +1,9 @@
-from django.urls import path, include
+from rest_framework import routers
 
-from . import views
-
+from .views import AgentViewSet
 
 app_name = "agents"
 
-urlpatterns = [
-    path("", views.AgentListView.as_view(), name="agents_list"),
-    path("<pk>/", views.AgentDetailView.as_view(), name="agents_detail_update_destroy"),
-]
+router = routers.SimpleRouter()
+router.register(r'', AgentViewSet, basename="agents")
+urlpatterns = router.urls
