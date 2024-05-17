@@ -26,11 +26,13 @@ class Integration(AbstractBaseModel):
 
     def __str__(self):
         return str(self.thirdparty.title)
-    
+
     def get_absolute_url(self):
         if not self.is_chat_app:
-            return reverse("integrations:agent-install", kwargs={"thirdparty": self.thirdparty})
-    
+            return reverse(
+                "integrations:agent-install", kwargs={"thirdparty": self.thirdparty}
+            )
+
     def get_oauth_url(self, state: str, user_email: str) -> str:
         if (
             self.thirdparty == ThirdParty.GMAIL
@@ -81,7 +83,7 @@ class Integration(AbstractBaseModel):
             flow.fetch_token(code=code)
             credentials = flow.credentials
             return credentials
-        
+
         elif self.thirdparty == ThirdParty.SLACK:  # no prepared token needed for this
             # Complete the installation by calling oauth.v2.access API method
             oauth_response = client.oauth_v2_access(
@@ -122,7 +124,7 @@ class Agent(AbstractBaseModel):
     access_token = models.CharField(max_length=255)
     refresh_token = models.CharField(max_length=255, null=True)
     token_uri = models.CharField(max_length=255, null=True)
-    id_token = models.CharField(max_length=255)
+    id_token = models.CharField(max_length=255, null=True)
     integration = models.ForeignKey(
         Integration, on_delete=models.CASCADE, related_name="agents"
     )
