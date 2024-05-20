@@ -161,6 +161,7 @@ class Agent(AbstractBaseModel):
 
 class Bot(AbstractBaseModel):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="bots")
+    integration = models.ForeignKey(Integration, on_delete=models.CASCADE, related_name="bots")
     app_id = models.CharField(max_length=255, null=True)
     user_id = models.CharField(max_length=255)
     enterprise_id = models.CharField(max_length=255, null=True)

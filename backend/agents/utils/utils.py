@@ -1,18 +1,10 @@
-from pprint import pprint
-from typing import List
-
 from django.conf import settings
 from google.oauth2.credentials import Credentials
 
-from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
-from langchain_core.prompts.base import BasePromptTemplate
-from langchain.tools.render import format_tool_to_openai_function
-from langchain.agents.format_scratchpad import format_to_openai_functions
-from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.utils.json_schema import dereference_refs
+from langchain.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import PromptTemplate
+from langgraph.prebuilt import create_react_agent
+from langgraph.prebuilt.tool_executor import ToolExecutor
 
 from .toolkits import GmailToolkit, GoogleCalenderToolkit
 from common.models import ThirdParty
@@ -23,33 +15,12 @@ GeminiLLM = ChatGoogleGenerativeAI(
 )
 
 
-# prompt = ChatPromptTemplate.from_messages(
-#     [
-#         ("system", """You are a helpful assistant that searches Salesforce Knowledge articles. Use tools (only if necessary) to best answer the users' questions. Return the response in Slack mrkdwn format, including emojis, bullet points, and bold text where necessary.
-
-# Slack message formatting example:
-# Bold text: *bold text*
-# Italic text: _italic text_
-# Bullet points: • example 1 \n • example 2 \n
-# Link: <fakeLink.toEmployeeProfile.com|Fred Enriquez - New device request>
-# Remember that slack mrkdwn formatting is different from regular markdown formatting. do not use regular markdown formatting in your response.
-# As an example do not us the following: **bold text** or [link](http://example.com),
-#          """),
-#         # Please note that the ordering of the user input vs.
-#         # the agent_scratchpad is important.
-#         # The agent_scratchpad is a working space for the agent to think,
-#         # invoke tools, see tools outputs in order to respond to the given
-#         # user input. It has to come AFTER the user input.
-#         ("user", "{input}"),
-#         MessagesPlaceholder(variable_name="agent_scratchpad"),
-#     ]
-# )
-
-
 def create_prompt(thirdparty="slack"):
+    system = None
+
     if thirdparty == ThirdParty.SLACK:
 
-        template = '''You are a helpful assistant searches domain knowledge. Use tools (only if necessary) to best answer the users' questions. 
+        system = '''You are a helpful assistant searches domain knowledge. Use tools (only if necessary) to best answer the users' questions. 
             Return the response in slack mrkdwn format, including emojis, bullet points, and bold text where necessary. 
             
             Slack message formatting example:
@@ -59,28 +30,13 @@ def create_prompt(thirdparty="slack"):
             Link: <fakeLink.toEmployeeProfile.com|Fred Enriquez - New device request>
             Remember that Slack mrkdwn formatting is different from regular markdown formatting. do not use regular markdown formatting in your response.
             As an example do not us the following: **bold text** or [link](http://example.com),
-            
-            You have access to the following tools:
+            '''
 
-            {tools}
-
-            Use the following format:
-
-            Question: the input question you must answer
-            Thought: you should always think about what to do
-            Action: the action to take, should be one of [{tool_names}]
-            Action Input: the input to the action
-            Observation: the result of the action
-            ... (this Thought/Action/Action Input/Observation can repeat N times)
-            Thought: I now know the final answer
-            Final Answer: the final answer to the original input question
-
-            Begin!
-
-            Question: {input}
-            Thought:{agent_scratchpad}'''
-
-    prompt = PromptTemplate.from_template(template, partial_variables={"thirdparty": thirdparty})
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system),
+        ("placeholder", "{messages}"),
+        ("user", "Remember, always be polite!"),
+    ])
 
     return prompt
 
@@ -103,12 +59,30 @@ def get_agent(integration: Integration, credential: Credentials):
         toolkit = GoogleCalenderToolkit(credentials=credential)
     tools = toolkit.get_tools()
 
-    prompt = create_prompt()
+    tool_executors = ToolExecutor(tools=tools)
+
+    # prompt = create_prompt(integration.thirdparty)
+
+    # def modify_messages(messages: list):
+    #     # You can do more complex modifications here
+    #     return prompt.invoke({"messages": messages})
+
     print(f"Created prompt successfully")
 
-    agent = create_react_agent(GeminiLLM, tools, prompt)
+    system = '''You are a helpful assistant searches domain knowledge. Use tools (only if necessary) to best answer the users' questions. 
+    Return the response in slack mrkdwn format, including emojis, bullet points, and bold text where necessary. 
+    
+    Slack message formatting example:
+    Bold text: *bold text*
+    Italic text: _italic text_
+    Bullet points: • example 1 \n • example 2 \n
+    Link: <fakeLink.toEmployeeProfile.com|Fred Enriquez - New device request>
+    Remember that Slack mrkdwn formatting is different from regular markdown formatting. do not use regular markdown formatting in your response.
+    As an example do not us the following: **bold text** or [link](http://example.com),
+    '''
 
-    agent_exceutor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = create_react_agent(model=GeminiLLM, tools=tool_executors, messages_modifier=system)
+
     print(f"Created agent successfully")
-    return agent_exceutor
+    return agent
     

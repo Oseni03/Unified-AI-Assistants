@@ -1,9 +1,9 @@
 from slack_sdk import WebClient
 
-from .models import Bot, Agent
+from .models import Bot, Agent, Integration
 
 
-def save_bot(agent: Agent, oauth_response: dict, client: WebClient):
+def save_bot(agent: Agent, oauth_response: dict, client: WebClient, integration: Integration):
     installed_enterprise = oauth_response.get("enterprise") or {}
     is_enterprise_install = oauth_response.get("is_enterprise_install")
     installed_team = oauth_response.get("team") or {}
@@ -21,6 +21,7 @@ def save_bot(agent: Agent, oauth_response: dict, client: WebClient):
 
     bot, _ = Bot.objects.get_or_create(
         agent=agent,
+        integration=integration,
         user_id=installer.get("id"),
         app_id=oauth_response.get("app_id"),
         team_id=installed_team.get("id"),

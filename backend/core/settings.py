@@ -102,6 +102,11 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+    },
+    "OPTIONS": {
+        # ...
+        "timeout": 20,
+        # ...
     }
 }
 
@@ -274,7 +279,6 @@ GOOGLE_DOCUMENT_SCOPES = []
 GOOGLE_DRIVE_SCOPES = []
 GOOGLE_SHEET_SCOPES = []
 GOOGLE_FORM_SCOPES = []
-DEFAULT_CREDS_TOKEN_FILE = BASE_DIR / "token.json"
 DEFAULT_CLIENT_SECRETS_FILE = BASE_DIR / "credentials.json"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")

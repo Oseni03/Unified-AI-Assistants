@@ -10,7 +10,7 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.signature import SignatureVerifier
 from slack_sdk import WebClient
 
-from agents.utils.utils import credentials_to_dict, get_agent
+from agents.utils.utils import credentials_to_dict
 from agents.serializers import AgentSerializer
 from common.models import State
 
@@ -83,7 +83,7 @@ class OAUTHCallbackView(APIView):
                 print(oauth_response)
 
                 agent = get_object_or_404(Agent, id=agent_id)
-                bot = save_bot(agent, oauth_response, client)
+                bot = save_bot(agent, oauth_response, client, integration)
 
                 serializer = BotSerializer(instance=bot)
 
@@ -219,7 +219,7 @@ class EventView(APIView):
                     thread_ts: {thread_ts}""")
             # send_agent_response.delay(agent.id, channel, thread_ts, bot_token, query)
             agent_response.send(
-                agent_id=agent.id,
+                bot_id=bot.id,
                 channel=channel,
                 thread_ts=thread_ts,
                 bot_token=bot_token,
