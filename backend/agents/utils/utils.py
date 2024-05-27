@@ -1,6 +1,7 @@
 from django.conf import settings
 from google.oauth2.credentials import Credentials
 
+from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
@@ -13,7 +14,7 @@ from integrations.models import Integration
 GeminiLLM = ChatGoogleGenerativeAI(
     model="gemini-pro", google_api_key=settings.GOOGLE_API_KEY
 )
-
+model = ChatOpenAI(model="gpt-4o")
 
 def create_prompt(thirdparty="slack"):
     system = None
@@ -81,7 +82,7 @@ def get_agent(integration: Integration, credential: Credentials):
     As an example do not us the following: **bold text** or [link](http://example.com),
     '''
 
-    agent = create_react_agent(model=GeminiLLM, tools=tool_executors, messages_modifier=system)
+    agent = create_react_agent(model=model, tools=tool_executors, messages_modifier=system)
 
     print(f"Created agent successfully")
     return agent
