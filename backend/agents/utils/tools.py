@@ -1,27 +1,438 @@
-import io
-import uuid
-import email
 import base64
 import datetime
-
+import email
 from enum import Enum
-from email.mime.text import MIMEText
+import io
+import uuid
+from httplib2 import Http
+from typing import Any, Dict, List, Optional, Type, Union
+from django.conf import settings
 from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
-from typing import Any, Dict, List, Optional, Union
-from django.conf import settings
-from httplib2 import Http
+from email.mime.text import MIMEText
 
 from simple_salesforce import Salesforce
 
 from langchain.tools import tool
+from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_community.tools.gmail.utils import clean_email_body
+from langchain_core.callbacks import CallbackManagerForToolRun
 
 from google.oauth2.credentials import Credentials
-from langchain_community.agent_toolkits import GmailToolkit
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+
+
+class Resource(str, Enum):
+    """Enumerator of Resources to search."""
+
+    THREADS = "threads"
+    MESSAGES = "messages"
+
+
+class CreateDraftSchema(BaseModel):
+    """Input for CreateDraftTool."""
+
+    message: str = Field(
+        ...,
+        description="The message to include in the draft.",
+    )
+    to: List[str] = Field(
+        ...,
+        description="The list of recipients.",
+    )
+    subject: str = Field(
+        ...,
+        description="The subject of the message.",
+    )
+    cc: Optional[List[str]] = Field(
+        None,
+        description="The list of CC recipients.",
+    )
+    bcc: Optional[List[str]] = Field(
+        None,
+        description="The list of BCC recipients.",
+    )
+
+
+class SendMessageSchema(BaseModel):
+    """Input for SendMessageTool."""
+
+    message: str = Field(
+        ...,
+        description="The message to send.",
+    )
+    to: Union[str, List[str]] = Field(
+        ...,
+        description="The list of recipients.",
+    )
+    subject: str = Field(
+        ...,
+        description="The subject of the message.",
+    )
+    cc: Optional[Union[str, List[str]]] = Field(
+        None,
+        description="The list of CC recipients.",
+    )
+    bcc: Optional[Union[str, List[str]]] = Field(
+        None,
+        description="The list of BCC recipients.",
+    )
+
+
+class GetMessageSchema(BaseModel):
+    """Input for GetMessageTool."""
+
+    message_id: str = Field(
+        ...,
+        description="The unique ID of the email message, retrieved from a search.",
+    )
+
+
+class SearchArgsSchema(BaseModel):
+    """Input for SearchGmailTool."""
+
+    # From https://support.google.com/mail/answer/7190?hl=en
+    query: str = Field(
+        ...,
+        description="The Gmail query. Example filters include from:sender,"
+        " to:recipient, subject:subject, -filtered_term,"
+        " in:folder, is:important|read|starred, after:year/mo/date, "
+        "before:year/mo/date, label:label_name"
+        ' "exact phrase".'
+        " Search newer/older than using d (day), m (month), and y (year): "
+        "newer_than:2d, older_than:1y."
+        " Attachments with extension example: filename:pdf. Multiple term"
+        " matching example: from:amy OR from:david.",
+    )
+    resource: Resource = Field(
+        default=Resource.MESSAGES,
+        description="Whether to search for threads or messages.",
+    )
+    max_results: int = Field(
+        default=10,
+        description="The maximum number of results to return.",
+    )
+
+
+class GetThreadSchema(BaseModel):
+    """Input for GetMessageTool."""
+
+    # From https://support.google.com/mail/answer/7190?hl=en
+    thread_id: str = Field(
+        ...,
+        description="The thread ID.",
+    )
+
+
+class GmailTools:
+    def __init__(self, creds: Credentials) -> None:
+        self.service = build("gmail", "v1", credentials=creds)
+    
+    def _prepare_draft_message(
+        self,
+        message: str,
+        to: List[str],
+        subject: str,
+        cc: Optional[List[str]] = None,
+        bcc: Optional[List[str]] = None,
+    ) -> dict:
+        draft_message = EmailMessage()
+        draft_message.set_content(message)
+
+        draft_message["To"] = ", ".join(to)
+        draft_message["Subject"] = subject
+        if cc is not None:
+            draft_message["Cc"] = ", ".join(cc)
+
+        if bcc is not None:
+            draft_message["Bcc"] = ", ".join(bcc)
+
+        encoded_message = base64.urlsafe_b64encode(draft_message.as_bytes()).decode()
+        return {"message": {"raw": encoded_message}}
+    
+    @tool(args_schema=CreateDraftSchema)
+    def create_draft(
+        self,
+        message: str,
+        to: List[str],
+        subject: str,
+        cc: Optional[List[str]] = None,
+        bcc: Optional[List[str]] = None,
+    ) -> dict:
+        """Tool that creates a draft email for Gmail.
+        
+        Use this tool to create a draft email with the provided message fields."""
+        
+        try:
+            create_message = self._prepare_draft_message(message, to, subject, cc, bcc)
+            draft = (
+                self.service.users()
+                .drafts()
+                .create(userId="me", body=create_message)
+                .execute()
+            )
+            output = f'Draft created. Draft Id: {draft["id"]}'
+            return output
+        except Exception as e:
+            raise Exception(f"An error occurred: {e}")
+    
+    def _prepare_message(
+        self,
+        message: str,
+        to: Union[str, List[str]],
+        subject: str,
+        cc: Optional[Union[str, List[str]]] = None,
+        bcc: Optional[Union[str, List[str]]] = None,
+    ) -> Dict[str, Any]:
+        """Create a message for an email."""
+        mime_message = MIMEMultipart()
+        mime_message.attach(MIMEText(message, "html"))
+
+        mime_message["To"] = ", ".join(to if isinstance(to, list) else [to])
+        mime_message["Subject"] = subject
+        if cc is not None:
+            mime_message["Cc"] = ", ".join(cc if isinstance(cc, list) else [cc])
+
+        if bcc is not None:
+            mime_message["Bcc"] = ", ".join(bcc if isinstance(bcc, list) else [bcc])
+
+        encoded_message = base64.urlsafe_b64encode(mime_message.as_bytes()).decode()
+        return {"raw": encoded_message}
+
+    @tool(args_schema=SendMessageSchema)
+    def send_message(
+        self,
+        message: str,
+        to: Union[str, List[str]],
+        subject: str,
+        cc: Optional[Union[str, List[str]]] = None,
+        bcc: Optional[Union[str, List[str]]] = None,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> str:
+        """Tool that sends a message to Gmail.
+        
+        Use this tool to send email messages. The input is the message, recipients"""
+        try:
+            create_message = self._prepare_message(message, to, subject, cc=cc, bcc=bcc)
+            send_message = (
+                self.service.users()
+                .messages()
+                .send(userId="me", body=create_message)
+            )
+            sent_message = send_message.execute()
+            return f'Message sent. Message Id: {sent_message["id"]}'
+        except Exception as error:
+            raise Exception(f"An error occurred: {error}")
+    
+    def _parse_threads(self, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Add the thread message snippets to the thread results
+        results = []
+        for thread in threads:
+            thread_id = thread["id"]
+            thread_data = (
+                self.api_resource.users()
+                .threads()
+                .get(userId="me", id=thread_id)
+                .execute()
+            )
+            messages = thread_data["messages"]
+            thread["messages"] = []
+            for message in messages:
+                snippet = message["snippet"]
+                thread["messages"].append({"snippet": snippet, "id": message["id"]})
+            results.append(thread)
+
+        return results
+
+    def _parse_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        results = []
+        for message in messages:
+            message_id = message["id"]
+            message_data = (
+                self.api_resource.users()
+                .messages()
+                .get(userId="me", format="raw", id=message_id)
+                .execute()
+            )
+
+            raw_message = base64.urlsafe_b64decode(message_data["raw"])
+
+            email_msg = email.message_from_bytes(raw_message)
+
+            subject = email_msg["Subject"]
+            sender = email_msg["From"]
+
+            message_body = ""
+            if email_msg.is_multipart():
+                for part in email_msg.walk():
+                    ctype = part.get_content_type()
+                    cdispo = str(part.get("Content-Disposition"))
+                    if ctype == "text/plain" and "attachment" not in cdispo:
+                        try:
+                            message_body = part.get_payload(decode=True).decode("utf-8")
+                        except UnicodeDecodeError:
+                            message_body = part.get_payload(decode=True).decode(
+                                "latin-1"
+                            )
+                        break
+            else:
+                message_body = email_msg.get_payload(decode=True).decode("utf-8")
+
+            body = clean_email_body(message_body)
+
+            results.append(
+                {
+                    "id": message["id"],
+                    "threadId": message_data["threadId"],
+                    "snippet": message_data["snippet"],
+                    "body": body,
+                    "subject": subject,
+                    "sender": sender,
+                }
+            )
+        return results
+
+    @tool(args_schema=SearchArgsSchema)
+    def search(
+        self,
+        query: str,
+        resource: Resource = Resource.MESSAGES,
+        max_results: int = 10,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> List[Dict[str, Any]]:
+        """Tool that searches for messages or threads in Gmail.
+        
+        The Gmail query. Example filters include from:sender,
+        to:recipient, subject:subject, -filtered_term,
+        in:folder, is:important|read|starred, after:year/mo/date, 
+        before:year/mo/date, label:label_name
+        "exact phrase".
+        Search newer/older than using d (day), m (month), and y (year): 
+        newer_than:2d, older_than:1y.
+        Attachments with extension example: filename:pdf. Multiple term
+        matching example: from:amy OR from:david."""
+
+        results = (
+            self.service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=max_results)
+            .execute()
+            .get(resource.value, [])
+        )
+        if resource == Resource.THREADS:
+            return self._parse_threads(results)
+        elif resource == Resource.MESSAGES:
+            return self._parse_messages(results)
+        else:
+            raise NotImplementedError(f"Resource of type {resource} not implemented.")
+    
+    @tool(args_schema=GetMessageSchema)
+    def get_message(
+        self,
+        message_id: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> Dict:
+        """Tool that gets a message by ID from Gmail.
+
+        Use this tool to fetch an email by message ID.
+        Returns the thread ID, snippet, body, subject, and sender."""
+
+        query = (
+            self.service.users()
+            .messages()
+            .get(userId="me", format="raw", id=message_id)
+        )
+        message_data = query.execute()
+        raw_message = base64.urlsafe_b64decode(message_data["raw"])
+
+        email_msg = email.message_from_bytes(raw_message)
+
+        subject = email_msg["Subject"]
+        sender = email_msg["From"]
+
+        message_body = ""
+        if email_msg.is_multipart():
+            for part in email_msg.walk():
+                ctype = part.get_content_type()
+                cdispo = str(part.get("Content-Disposition"))
+                if ctype == "text/plain" and "attachment" not in cdispo:
+                    message_body = part.get_payload(decode=True).decode("utf-8")
+                    break
+        else:
+            message_body = email_msg.get_payload(decode=True).decode("utf-8")
+
+        body = clean_email_body(message_body)
+
+        return {
+            "id": message_id,
+            "threadId": message_data["threadId"],
+            "snippet": message_data["snippet"],
+            "body": body,
+            "subject": subject,
+            "sender": sender,
+        }
+    
+    @tool(args_schema=GetThreadSchema)
+    def get_thread(
+        self,
+        thread_id: str,
+        run_manager: Optional[CallbackManagerForToolRun] = None,
+    ) -> Dict:
+        """Tool that gets a thread by ID from Gmail.
+        
+        Use this tool to search for email messages."
+        The input must be a valid Gmail query.
+        The output is a JSON list of messages."""
+
+        query = self.service.users().threads().get(userId="me", id=thread_id)
+        thread_data = query.execute()
+        if not isinstance(thread_data, dict):
+            raise ValueError("The output of the query must be a list.")
+        messages = thread_data["messages"]
+        thread_data["messages"] = []
+        keys_to_keep = ["id", "snippet", "snippet"]
+        # TODO: Parse body.
+        for message in messages:
+            thread_data["messages"].append(
+                {k: message[k] for k in keys_to_keep if k in message}
+            )
+        return thread_data
+
+
+class GoogleCalenderTools:
+    def __init__(self, creds: Credentials) -> None:
+        self.service = build("calender", "v3", credentials=creds)
+
+    @tool
+    def get_event_list(
+        self,
+        calender_id: str = "primary",
+        time: datetime.datetime = datetime.datetime.now(datetime.UTC).isoformat() + "Z",
+        max_result: int = 10,
+    ):
+        """Get list of calender events in google calender"""
+        print("Getting the upcoming 10 events")
+        events_result = (
+            self.service.events()
+            .list(
+                calendarId=calender_id,
+                timeMin=time,
+                maxResults=max_result,
+                singleEvents=True,
+                orderBy="startTime",
+            )
+            .execute()
+        )
+        events = events_result.get("items", [])
+        return events
+    
+    def get_tools(self) -> List:
+        """Get the tools in the toolkit."""
+        return [
+            self.get_event_list,
+        ]
 
 
 class GoogleDocTools:
@@ -46,6 +457,36 @@ class GoogleDocTools:
 class GoogleDriveTools:
     def __init__(self, creds: Credentials) -> None:
         self.service = build("drive", "v3", credentials=creds)
+
+    @tool
+    def get_file_list(self, page_size=10):
+        """get list of files in google drive"""
+        # Call the Drive v3 API
+        results = (
+            self.service.files()
+            .list(page_size=10, fields="nextPageToken, files(id, name)")
+            .execute()
+        )
+        items = results.get("files", [])
+        return items
+
+    @tool
+    def create_drive(self, name: str):
+        """Create a drive.
+        Returns:
+            Id of the created drive"""
+
+        drive_metadata = {"name": name}
+        request_id = str(uuid.uuid4())
+        # pylint: disable=maybe-no-member
+        drive = (
+            self.service.drives()
+            .create(body=drive_metadata, requestId=request_id, fields="id")
+            .execute()
+        )
+        print(f'Drive ID: {drive.get("id")}')
+        drive["name"] = name
+        return drive
 
     @tool("Find all shared drives without an organizer and add one")
     def recover_drives(self, user_email_address: str):
@@ -108,6 +549,127 @@ class GoogleDriveTools:
         return drives
 
     @tool
+    def fetch_changes(self):
+        """Retrieve the list of changes for the currently authenticated user.
+            prints changed file's ID
+
+        Returns: changes (changed files)
+        """
+
+        try:
+            # Begin with our last saved start token for this user or the
+            # current token from getStartPageToken()
+            page_token = (
+                self.service.changes()
+                .getStartPageToken()
+                .execute()
+                .get("startPageToken")
+            )
+            # pylint: disable=maybe-no-member
+
+            changes = []
+
+            while page_token is not None:
+                response = (
+                    self.service.changes()
+                    .list(pageToken=page_token, spaces="drive")
+                    .execute()
+                )
+                for change in response.get("changes"):
+                    # Process change
+                    print(f'Change found for file: {change.get("fileId")}')
+                    changes.append(change)
+                if "newStartPageToken" in response:
+                    # Last page, save this token for the next polling interval
+                    saved_start_page_token = response.get("newStartPageToken")
+                page_token = response.get("nextPageToken")
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            changes = []
+
+        return changes
+
+    @tool
+    def fetch_appdata_folder(self):
+        """List out application data folder and prints folder ID.
+        Returns : Folder ID
+        """
+
+        try:
+            # pylint: disable=maybe-no-member
+            file = (
+                self.service.files().get(fileId="appDataFolder", fields="id").execute()
+            )
+            print(f'Folder ID: {file.get("id")}')
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            file = None
+
+        return file.id
+
+    @tool
+    def list_appdata(self):
+        """List all files inserted in the application data folder
+        prints file titles with Ids.
+        Returns : List of items
+        """
+
+        try:
+            # pylint: disable=maybe-no-member
+            response = (
+                self.service.files()
+                .list(
+                    spaces="appDataFolder",
+                    fields="nextPageToken, files(id, name)",
+                    pageSize=10,
+                )
+                .execute()
+            )
+            for file in response.get("files", []):
+                # Process change
+                print(f'Found file: {file.get("name")}, {file.get("id")}')
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            response = None
+
+        return response.get("files")
+
+    @tool
+    def upload_to_folder(self, file_name: str, mimetype: str, folder_id=None):
+        """Insert a file in the application data folder and prints file Id.
+        Args:
+            file_name: file name
+            mimetype: file mimetype
+            folder_id: Id of the folder
+
+        Returns : ID's of the inserted files
+        """
+
+        try:
+            # pylint: disable=maybe-no-member
+            if folder_id:
+                parent_folder = [folder_id]
+            else:
+                parent_folder = ["appDataFolder"]
+
+            file_metadata = {"name": file_name, "parents": parent_folder}
+            media = MediaFileUpload(file_name, mimetype=mimetype, resumable=True)
+            file = (
+                self.service.files()
+                .create(body=file_metadata, media_body=media, fields="id")
+                .execute()
+            )
+            print(f'File ID: {file.get("id")}')
+            return file.get("id")
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            return None
+
+    @tool
     def share_file(self, real_file_id, real_user, real_domain):
         """Batch permission modification.
         Args:
@@ -165,6 +727,74 @@ class GoogleDriveTools:
             ids = None
 
         return ids
+
+    @tool
+    def search_file(self, mimetype="image/jpeg"):
+        """Search file in drive location
+        Args:
+            mimetype: file mimetype
+        """
+
+        try:
+            files = []
+            page_token = None
+            while True:
+                # pylint: disable=maybe-no-member
+                response = (
+                    self.service.files()
+                    .list(
+                        q=f"mimeType='{mimetype}'",
+                        spaces="drive",
+                        fields="nextPageToken, files(id, name)",
+                        pageToken=page_token,
+                    )
+                    .execute()
+                )
+                for file in response.get("files", []):
+                    # Process change
+                    print(f'Found file: {file.get("name")}, {file.get("id")}')
+                files.extend(response.get("files", []))
+                page_token = response.get("nextPageToken", None)
+                if page_token is None:
+                    break
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            files = None
+
+        return files
+
+    @tool
+    def move_file_to_folder(self, file_id, folder_id):
+        """Move specified file to the specified folder.
+        Args:
+            file_id: Id of the file to move.
+            folder_id: Id of the folder
+        Print: An object containing the new parent folder and other meta data
+        Returns : Parent Ids for the file
+        """
+
+        try:
+            # pylint: disable=maybe-no-member
+            # Retrieve the existing parents to remove
+            file = self.service.files().get(fileId=file_id, fields="parents").execute()
+            previous_parents = ",".join(file.get("parents"))
+            # Move the file to the new folder
+            file = (
+                self.service.files()
+                .update(
+                    fileId=file_id,
+                    addParents=folder_id,
+                    removeParents=previous_parents,
+                    fields="id, parents",
+                )
+                .execute()
+            )
+            return file.get("parents")
+
+        except HttpError as error:
+            print(f"An error occurred: {error}")
+            return None
 
     @tool
     def export_pdf(self, real_file_id):
@@ -380,6 +1010,7 @@ class GoogleDriveTools:
         ]
 
 
+# SCOPES = ["https://www.googleapis.com/auth/drive"]
 class GoogleSheetTools:
     def __init__(self, creds: Credentials) -> None:
         self.service = build("sheets", "v4", credentials=creds)
@@ -1112,3 +1743,6 @@ class SalesForceTools:
 
         except Exception as e:
             return f"Error searching for Account summary: {str(e)}"
+    
+    def get_tools():
+        return []

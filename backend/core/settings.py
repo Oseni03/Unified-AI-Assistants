@@ -315,3 +315,7 @@ DRAMATIQ_TASKS_DATABASE = "default"
 #         "result_ttl": 1000 * 60 * 10
 #     }
 # }
+
+
+# OPENAI CONFIGURATION
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")

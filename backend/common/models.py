@@ -27,11 +27,7 @@ class AbstractBaseModel(models.Model):
 
 
 class ThirdParty(models.TextChoices):
-    GMAIL = "gmail", _("Google Mail")
-    GOOGLE_CALENDER = "google-calender", _("Google Calender")
-    GOOGLE_DOCUMENT = "google-document", _("Google Document")
-    GOOGLE_DRIVE = "google-drive", _("Google Drive")
-    GOOGLE_SHEET = "google-sheet", _("Google Sheet")
+    GOOGLE_WORKSPACE = "google-workspace", _("Google Workspace")
     GOOGLE_FORM = "google-form", _("Google Form")
     SALESFORCE = "salesforce", _("Salesforce")
     SLACK = "slack", _("Slack")

@@ -20,7 +20,11 @@ class Integration(AbstractBaseModel):
         max_length=50, unique=True, choices=ThirdParty.choices
     )
     is_chat_app = models.BooleanField(
-        help_text="Is it a messaging app integration or other thirdparty integration"
+        help_text="Is it a messaging app integration or other thirdparty integration?"
+    )
+    is_workspace = models.BooleanField(
+        help_text="Does it comprise multiple agents or a single agent?", 
+        default=False
     )
     is_active = models.BooleanField(default=True)
 
