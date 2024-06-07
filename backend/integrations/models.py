@@ -198,6 +198,9 @@ class Bot(AbstractBaseModel):
     is_enterprise_install = models.BooleanField(default=False)
     token_type = models.CharField(max_length=255, null=True)
     installed_at = models.DateTimeField(auto_now=True)
+    whatsapp_id = models.CharField(max_length=255, null=True)
+    whatsapp_name = models.CharField(max_length=255, null=True)
+    whatsapp_recipient_id = models.CharField(max_length=255, null=True)
     custom_values = models.JSONField(null=True)
 
     class Meta:

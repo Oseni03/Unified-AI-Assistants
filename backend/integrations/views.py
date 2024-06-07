@@ -15,9 +15,9 @@ from agents.serializers import AgentSerializer
 from common.models import State
 
 from .utils import save_bot
-from .tasks import agent_response
 from .models import Bot, Integration, Agent
 from .serializers import BotSerializer, IntegrationSerializer
+from .utils import is_valid_whatsapp_message, process_whatsapp_message, is_valid_slack_message, process_slack_message
 
 
 # Create your views here.
@@ -145,87 +145,23 @@ class EventView(APIView):
 
         data = request.data
 
-        data_type = data.get("type")
-        allowed_data_types = [
-            "url_verification",
-            "event_callback"
-        ]
-
-        if data_type not in allowed_data_types:
-            return Response("Not Allowed", status=status.HTTP_400_BAD_REQUEST)
-
-        if data_type == "url_verification":
+        data_type = data.get("type", "")
+        # Check if it's a WhatsApp status update
+        if (
+            data.get("entry", [{}])[0]
+            .get("changes", [{}])[0]
+            .get("value", {})
+            .get("statuses")
+        ):
+            print("Received a WhatsApp status update.")
+            return Response(status=status.HTTP_200_OK)
+        elif data_type == "url_verification":
             challenge = data.get("challenge")
             return Response({"challenge": challenge}, status=status.HTTP_200_OK)
-
-        elif data_type == "event_callback":
-            event = data.get("event") or {}
-
-            # print(event)
-
-            # in the case where this app gets a request from an Enterprise Grid workspace
-            # enterprise_id = data.get("enterprise_id")
-            # The workspace's ID
-            team_id = data.get("team_id")
-            user_id = event.get("user")
-            query = event.get("text")
-            channel = event.get("channel")
-            thread_ts = event.get("ts")
-
-            # Lookup the stored bot token for this workspace
-            try:
-                bot = Bot.objects.get(
-                    user_id=user_id,
-                    team_id=team_id,
-                )
-            except:
-                return Response(status=status.HTTP_200_OK)
-
-            agent = bot.agent
-            bot_token = bot.access_token
-            if not bot_token:
-                # The app may be uninstalled or be used in a shared channel
-                return Response(
-                    "Please install this app first!", status=status.HTTP_200_OK
-                )
-
-            client = WebClient(token=bot_token)
-            bot_id = client.api_call("auth.test")["user_id"]
-
-            if event.get("type") == "app_mention":
-                blocks = event.get("blocks") or []
-                elements = blocks[0].get("elements") or []
-                user_id = elements[0].get("user_id")
-                query = elements[1].get("text")
-            else:
-                user_id = event.get("user")
-                query = event.get("text")
-
-            # Ignore bot's own message
-            if user_id == bot_id:
-                return Response(status=status.HTTP_200_OK)
-
-            # Post an initial message
-            # result = client.chat_postMessage(
-            #     channel=channel, text=":mag: Searching...", thread_ts=thread_ts
-            # )
-            # thread_ts = result.get("ts")
-
-            print("About to run task")
-            print(f"""agent_id: {agent.id}
-                    channel: {channel}
-                    bot_token: {bot_token}
-                    query: {query}
-                    thread_ts: {thread_ts}""")
-            # send_agent_response.delay(agent.id, channel, thread_ts, bot_token, query)
-            agent_response.send(
-                bot_id=bot.id,
-                channel=channel,
-                thread_ts=thread_ts,
-                bot_token=bot_token,
-                query=query,
-                user_id=user_id,
-            )
-
+        if is_valid_whatsapp_message(data):
+            process_whatsapp_message(data)
+            return Response(status=status.HTTP_200_OK)
+        elif is_valid_slack_message(data):
+            process_slack_message(data)
             return Response(status=status.HTTP_200_OK)
         return Response({"message": "No event"}, status=status.HTTP_200_OK)
