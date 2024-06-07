@@ -48,12 +48,14 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_dramatiq",
+    'channels',
     # INTERNAL APPS
     "common",
     "accounts",
     "agents",
     "integrations",
     "feedbacks",
+    "chat",
 ]
 
 MIDDLEWARE = [
@@ -92,7 +94,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "core.wsgi.application"
+ASGI_APPLICATION = 'core.asgi.application'
 
 
 # Database
@@ -269,21 +271,34 @@ SLACK_EVENT_URL = urljoin(DOMAIN_URL, "/api/integrations/event")
 SLACK_STATE_EXPIRATION_SECONDS = env("SLACK_STATE_EXPIRATION_SECONDS", default=3000)
 
 # GOOGLE CONFIGURATIONS
-DISCOVERY_DOC = "https://forms.googleapis.com/$discovery/rest?version=v1"
-GOOGLE_GMAIL_SCOPES = ["https://mail.google.com/"]
-GOOGLE_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
-GOOGLE_CALENDER_SCOPES = [
+GOOGLE_WORKSPACE_SCOPE = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive.labels",
+    "https://mail.google.com/",
+    "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://spreadsheets.google.com/feeds/"
 ]
-GOOGLE_DOCUMENT_SCOPES = []
-GOOGLE_DRIVE_SCOPES = []
-GOOGLE_SHEET_SCOPES = []
-GOOGLE_FORM_SCOPES = []
 DEFAULT_CLIENT_SECRETS_FILE = BASE_DIR / "credentials.json"
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
-INTEGRATION_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/integrations/oauth/callback")
+GOOGLE_AUTH_URI = env("GOOGLE_AUTH_URI", default="")
+GOOGLE_TOKEN_URI = env("GOOGLE_TOKEN_URI", default="")
+INTEGRATION_REDIRECT_URI = urljoin(DOMAIN_URL, "/api/agents/callback")
 GOOGLE_API_KEY = env("GOOGLE_API_KEY", default="")  # For GeminiAPI 
+
+
+# ZOHO CONFIGURATION
+ZOHO_SCOPE = []
+ZOHO_CLIENT_ID = env("ZOHO_CLIENT_ID", default="")
+ZOHO_CLIENT_SECRET = env("ZOHO_CLIENT_SECRET", default="")
+ZOHO_AUTH_URI = env("ZOHO_AUTH_URI", default="")
+ZOHO_TOKEN_URI = env("ZOHO_TOKEN_URI", default="")
 
 
 # DRAMATIQ CONFIGURATIONS
@@ -319,3 +334,13 @@ DRAMATIQ_TASKS_DATABASE = "default"
 
 # OPENAI CONFIGURATION
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+
+# CHANNELS CONFIGURATIONS
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+    },
+}

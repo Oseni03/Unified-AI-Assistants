@@ -75,7 +75,7 @@ class UserSignupSerializer(serializers.ModelSerializer):
             update_last_login(None, user)
         
         notifications.AccountActivationEmail(
-            user=user, data={'user_id': user.id.hashid, 'token': tokens.account_activation_token.make_token(user)}
+            user=user, data={'user_id': user.id, 'token': tokens.account_activation_token.make_token(user)}
         ).send()
         
         data = UserSerializer(user).data

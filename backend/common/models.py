@@ -28,26 +28,6 @@ class AbstractBaseModel(models.Model):
 
 class ThirdParty(models.TextChoices):
     GOOGLE_WORKSPACE = "google-workspace", _("Google Workspace")
-    GOOGLE_FORM = "google-form", _("Google Form")
+    ZOHO_WORKSPACE = "zoho-workspace", _("Zoho Workspace")
     SALESFORCE = "salesforce", _("Salesforce")
     SLACK = "slack", _("Slack")
-
-
-class State(AbstractBaseModel):
-    is_used = models.BooleanField(default=False)
-    state = models.CharField(max_length=300)
-    thirdparty = models.CharField(max_length=25, choices=ThirdParty.choices)
-
-    @classmethod
-    def issue(cls, thirdparty: ThirdParty):
-        state = State(
-            state=hashlib.sha256(os.urandom(1024)).hexdigest(),
-            thirdparty=thirdparty)
-        state.save()
-        return state.state
-    
-    @classmethod
-    def consume(cls, state):
-        state = State.objects.get(state=state)
-        state.is_used = True
-        state.save()

@@ -1,26 +1,34 @@
 from rest_framework import serializers
 from hashid_field import rest
 
-from .models import Message
+from .models import Agent
 
-from integrations.models import Agent
-from integrations.serializers import BotSerializer, IntegrationSerializer
+from common.models import ThirdParty
+from integrations.serializers import IntegrationSerializer
 
 
 class AgentSerializer(serializers.ModelSerializer):
     id = rest.HashidSerializerCharField(read_only=True)
-    # user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    bots = BotSerializer(many=True, read_only=True)
-    integration = IntegrationSerializer(many=False, read_only=True)
-    
-    class Meta:
-        model = Agent 
-        fields = ("id", "name", "is_public", "bots", "integration", "created_at")
+    thirdparty = serializers.ChoiceField(choices=ThirdParty.choices)
+    integration = IntegrationSerializer(read_only=True)
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
-
-class MessageSerializer(serializers.ModelSerializer):
-    id = rest.HashidSerializerCharField(read_only=True)
-    
     class Meta:
-        model = Message 
-        exclude = ("updated_at", "created_at")
+        model = Agent
+        fields = (
+            "id",
+            "name",
+            "thirdparty",
+            "instance_url",
+            "integration",
+            "user",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate(self, attrs):
+        if attrs.get("thirdparty", None) == ThirdParty.SALESFORCE and not attrs.get(
+            "instance_url", None
+        ):
+            raise ValueError({"instance_url": "This field needed"})
+        return attrs
