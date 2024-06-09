@@ -11,6 +11,7 @@ urlpatterns = [
                 path("", include("common.urls", namespace="common")),
                 path("", include("accounts.urls", namespace="accounts")),
                 path("agents/", include("agents.urls", namespace="agents")),
+                path("integrations/", include("integrations.urls", namespace="integrations")),
             ]
         ),
     ),

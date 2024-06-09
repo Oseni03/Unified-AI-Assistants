@@ -9,4 +9,4 @@ class IntegrationSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Integration
-        fields = '__all__'
+        fields = ("id", "thirdparty", "is_chat_app")
