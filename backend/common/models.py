@@ -15,9 +15,9 @@ class AbstractBaseModel(models.Model):
     An abstract model with fields/properties that should belong to all our models.
     """
 
-    id = hashid_field.HashidAutoField(primary_key=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id: str = hashid_field.HashidAutoField(primary_key=True)
+    created_at: datetime.datetime = models.DateTimeField(auto_now_add=True)
+    updated_at: datetime.datetime = models.DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True

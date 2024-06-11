@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "integrations",
     "feedbacks",
     "chat",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -344,3 +345,7 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+
+# NOTIFICATION CONFIGURATIONS
+NOTIFICATIONS_STRATEGIES = ["InAppNotificationStrategy"]

@@ -12,6 +12,7 @@ urlpatterns = [
                 path("", include("accounts.urls", namespace="accounts")),
                 path("agents/", include("agents.urls", namespace="agents")),
                 path("integrations/", include("integrations.urls", namespace="integrations")),
+                path("notifications/", include("notifications.urls", namespace="notifications")),
             ]
         ),
     ),
