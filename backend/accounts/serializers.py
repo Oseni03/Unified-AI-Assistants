@@ -21,7 +21,6 @@ UPLOADED_AVATAR_SIZE_LIMIT = 1 * 1024 * 1024
 
 class UserSerializer(serializers.ModelSerializer):
     id = rest.HashidSerializerCharField(read_only=True)
-    email = serializers.CharField(read_only=True)
     avatar = serializers.FileField(required=False)
 
     class Meta:

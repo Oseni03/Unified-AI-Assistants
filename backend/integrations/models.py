@@ -12,6 +12,7 @@ from accounts.models import User
 class Integration(AbstractBaseModel):
     thirdparty = models.CharField(max_length=25, choices=ThirdParty.choices)
     is_chat_app = models.BooleanField(default=False)
+    is_workspace = models.BooleanField(default=False)
     access_token = models.CharField(max_length=255)
     refresh_token = models.CharField(max_length=255)
     webhook_url = models.CharField(max_length=255, null=True, blank=True)

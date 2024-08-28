@@ -11,7 +11,9 @@ from integrations.models import Integration
 from feedbacks.serializers import TicketSerializer
 from feedbacks.models import Ticket
 from chat.models import ChatMessage
+from chat.tasks import chat_response
 from chat.serializers import ChatMessageSerializer
+from common.models import ThirdParty
 
 from .models import Agent
 from .serializers import AgentSerializer
@@ -56,9 +58,21 @@ class AgentViewSet(
                 response = oauth_response.json()
                 integration = Integration.objects.create(
                     thirdpary=agent.thirdparty,
+                    is_workspace=(
+                        True
+                        if agent.thirdparty == ThirdParty.GOOGLE_WORKSPACE
+                        or agent.thirdparty == ThirdParty.ZOHO_WORKSPACE
+                        else False
+                    ),
                     access_token=response.get("access_token"),
                     refresh_token=response.get("refresh_token"),
-                    expires_at=timezone.now() + timedelta(seconds=int(response.get("expires_in", None) or response.get("issued_at"))),
+                    expires_at=timezone.now()
+                    + timedelta(
+                        seconds=int(
+                            response.get("expires_in", None)
+                            or response.get("issued_at")
+                        )
+                    ),
                     user=request.user,
                 )
                 agent.integration = integration
@@ -87,10 +101,12 @@ class AgentViewSet(
         elif request.method == "POST":
             data = request.data
             chat_message = ChatMessage.objects.create(
-                agent=agent,
-                message=data["message"]
+                agent=agent, message=data["message"]
             )
-            return Response(ChatMessageSerializer(chat_message).data, status=status.HTTP_201_CREATED)
+            chat_response.send(chat_message.id)
+            return Response(
+                ChatMessageSerializer(chat_message).data, status=status.HTTP_201_CREATED
+            )
 
     @action(detail=True, methods=["post"], serializer_class=TicketSerializer)
     def feedbacks(self, request, pk=None):
@@ -99,11 +115,11 @@ class AgentViewSet(
         if serializer.is_valid(raise_exception=True):
             serializer.save(agent=agent)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    
-    @action(detail=True, methods=['post'])
+
+    @action(detail=True, methods=["post"])
     def set_webhook(self, request, pk=None):
         integration = self.get_object().integration
-        webhook_url = request.data.get('webhook_url')
+        webhook_url = request.data.get("webhook_url")
         integration.webhook_url = webhook_url
         integration.save()
-        return Response({'status': 'Webhook URL set'}, status=status.HTTP_200_OK)
+        return Response({"status": "Webhook URL set"}, status=status.HTTP_200_OK)

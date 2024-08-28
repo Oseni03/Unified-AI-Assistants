@@ -140,7 +140,7 @@ def get_agent(integration: Integration, credential: Credentials = None, username
     llm = ChatOpenAI(model="gpt-4o", openai_api_key=settings.OPENAI_API_KEY)
 
     if integration.is_workspace:
-        if integration.thirdparty == ThirdParty.GOOGLE_WORKSPACE:
+        if integration.thirdparty == ThirdParty.GOOGLE_WORKSPACE and credential is not None:
             agent = create_google_workspace_multi_agent(llm, credential=credential)
     else:
         tools = []

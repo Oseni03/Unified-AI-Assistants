@@ -86,4 +86,4 @@ def generate_otp_auth_token(user):
     otp_auth_token["user_id"] = str(user.id)
     otp_auth_token.set_exp(from_time=timezone.now(), lifetime=settings.OTP_AUTH_TOKEN_LIFETIME_MINUTES)
 
-    return OTP_AUTH_TOKEN_LIFETIME_MINUTES
+    return otp_auth_token
